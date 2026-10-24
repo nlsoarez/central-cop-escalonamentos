@@ -11,3 +11,5 @@ Os botões indicam seleção/expansão para tecnologias assistivas. O foco é pr
 Validação: 70 testes aprovados, verificação de sintaxe e build estático aprovados. Fluxo verificado no navegador com dados sintéticos: início vazio, seleção de RJ, seleção de Baixada Fluminense, troca para MG com Enter e desmarcação com Espaço. A seleção inclui os gestores regionais aplicáveis e mantém o foco no botão. Nenhum erro no console. A disposição móvel possui regras responsivas; esta verificação funcional usou o viewport padrão do navegador.
 
 A alteração é somente no frontend, sem migração ou alteração dos contatos do banco.
+
+Publicação: deployment `dpl_J7rWmfkJtH5PhwnZXqkKPCAMmekj`, código `527b6bd`, status READY no domínio principal. A configuração pública do backend foi preservada no pacote estático, sem expor credenciais privadas.
