@@ -9,9 +9,9 @@ const block=(sheet,rows,merges=[])=>({sheet,rows,merges});
 
 test('blocos repetidos preservam áreas, tecnologias e níveis do título',()=>{
  const p=parseWorkbook([block('RJ',[
-  ['Área Exemplo A'],['1º NÍVEL DE ESCALONAMENTO'],header,person(),
+  ['Área Exemplo A'],['1º NÍVEL DE ESCALONAMENTO'],['SUPERVISOR REDE EXTERNA'],header,person(),
   ['2º NÍVEL DE ESCALONAMENTO'],['REGIONAL','ÁREA','NOME','CARGO','E-MAIL','TELEFONE'],person(),
-  ['Área Exemplo B'],['1° NÍVEL DE ESCALONAMENTO'],header,person()
+  ['Área Exemplo B'],['1° NÍVEL DE ESCALONAMENTO'],['TÉCNICO I - REDE EXTERNA (PONTO FOCAL)'],header,person()
  ])]);
  assert.equal(p.errors.length,0);assert.equal(p.valid.length,3);
  assert.deepEqual(p.valid.map(c=>[c.area,c.nivel,c.topologia]),[['Área Exemplo A','1','GPON'],['Área Exemplo A','2','GPON'],['Área Exemplo B','1','GPON']]);

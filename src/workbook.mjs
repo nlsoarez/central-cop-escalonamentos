@@ -96,7 +96,7 @@ export function parseWorkbook(tables){
    if(h){headers=h;continue;}
    if(populated.length===1){
     const title=populated[0];
-    if(/^(?:e?scalonamento|supervisores?\b|coordenador(?:es|e)?\b|gerentes?\b|diretor(?:es)?\b)/i.test(title))continue;
+    if(/^(?:e?scalonamento|supervisor(?:es)?\b|coordenador(?:es|e)?\b|gerentes?\b|diretor(?:es)?\b|t[eé]cnicos?\b)/i.test(title))continue;
     section=title;headers=null;continue;
    }
    if(!headers){errors.push({sheet:table.sheet,row:i+1,message:'Linha de dados fora de um bloco com cabeçalho reconhecido'});continue;}
