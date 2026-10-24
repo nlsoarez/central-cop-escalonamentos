@@ -22,3 +22,10 @@ test('sessão revogada é encerrada antes de consultar o perfil',async()=>{
  })});
  assert.equal(await store.session(),null);assert.equal(signedOut,true);
 });
+test('falha de rede após senha aceita é identificada como validação de sessão',async()=>{
+ const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:()=>({
+  auth:{signInWithPassword:async()=>({data:{}}),getUser:async()=>({data:{user:{id:'synthetic'}}})},
+  rpc:async()=>({error:Error('Failed to fetch')})
+ })});
+ await assert.rejects(store.signIn('F9900001','synthetic'),error=>error.stage==='session'&&error.message.includes('senha foi aceita'));
+});

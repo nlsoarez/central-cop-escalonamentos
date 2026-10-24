@@ -222,8 +222,12 @@ root.addEventListener('submit',async e=>{
  }
  if(e.target.id==='loginForm'){
   e.preventDefault();const f=new FormData(e.target);
-  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));loadPreferences();if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
-  catch{toast('Não foi possível entrar. Confira matrícula e senha ou procure o administrador.','error');}return;
+  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));}
+  catch(error){toast(['session','network'].includes(error.stage)?error.message:'Não foi possível entrar. Confira matrícula e senha ou procure o administrador.','error');return;}
+  loadPreferences();
+  try{if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
+  catch{render();toast('Login confirmado, mas não foi possível carregar os dados. Recarregue a página para tentar novamente.','error');}
+  return;
  }
  if(e.target.id==='changePasswordForm'){
   e.preventDefault();

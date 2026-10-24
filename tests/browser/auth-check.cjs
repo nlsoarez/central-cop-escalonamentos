@@ -4,7 +4,7 @@ async (page) => {
  await page.route('**/supabase.min.js',route=>route.fulfill({contentType:'text/javascript',body:`
  let logged=false,changed=false;
  window.supabase={createClient:()=>({
- auth:{getUser:async()=>({data:{user:logged?{id:'synthetic-viewer',email:'viewer@example.invalid'}:null}}),signOut:async()=>{logged=false;return {};},signInWithPassword:async({password})=>{if(password==='incorrect')return {error:Error('DO NOT DISPLAY PROVIDER DETAIL')};logged=true;return {data:{}};}},
+ auth:{getUser:async()=>({data:{user:logged?{id:'synthetic-viewer',email:'viewer@example.invalid'}:null}}),signOut:async()=>{logged=false;return {};},signInWithPassword:async({password})=>{if(password==='incorrect')return {error:Object.assign(Error('DO NOT DISPLAY PROVIDER DETAIL'),{status:401})};logged=true;return {data:{}};}},
  rpc:async()=>({data:true}),
  from:(table)=>{
   const q={select:()=>q,eq:()=>q,order:()=>q,

@@ -43,8 +43,15 @@ export const store={
     const email=login.includes('@') ? String(identifier).trim().toLowerCase() :
       login.toLowerCase() + '@users.central-cop.invalid';
     // Alias interno na autenticação; senhas nunca são mantidas no navegador pelo portal.
-    expect(await client.auth.signInWithPassword({email,password}));
-    return this.session();
+    const result=await client.auth.signInWithPassword({email,password});
+    if(result.error){
+      const status=result.error.status;
+      if(status===429)throw Object.assign(Error('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.'),{stage:'network'});
+      if(![400,401,422].includes(status))throw Object.assign(Error('Não foi possível conectar ao serviço de acesso. Tente novamente em instantes.'),{stage:'network'});
+      throw result.error;
+    }
+    try{return await this.session();}
+    catch(cause){throw Object.assign(Error('Sua senha foi aceita, mas não foi possível validar a sessão. Tente novamente em instantes.'),{stage:'session',cause});}
   },
   async invoke(name,body){
     if(!client)throw Error('Banco independente ainda não configurado.');

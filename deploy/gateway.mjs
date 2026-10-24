@@ -24,7 +24,7 @@ export function createGateway({anonKey,serviceKey,origins,trustProxy=false,limit
   const cors={
    'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin',
    ...(origin&&origins.includes(origin)?{'Access-Control-Allow-Origin':origin}:{}),
-   'Access-Control-Allow-Headers':'authorization,apikey,x-client-info,content-type,prefer,range,range-unit,x-supabase-api-version',
+   'Access-Control-Allow-Headers':'authorization,apikey,x-client-info,content-type,accept-profile,content-profile,prefer,range,range-unit,x-supabase-api-version',
    'Access-Control-Allow-Methods':'GET,HEAD,POST,PATCH,DELETE,OPTIONS',
    'Access-Control-Expose-Headers':'content-range,range-unit,preference-applied,x-total-count'
   };

@@ -23,7 +23,11 @@ test('gateway aplica chaves, CORS, fluxo de senha e limites via HTTP',async t=>{
  assert.equal((await fetch(base+'/rest/v1/cop_contacts')).status,401);
  assert.equal((await request('/rest/v1/cop_contacts',{headers:{apikey:'é'.repeat(9)}})).status,401);
  assert.equal((await request('/rest/v1/cop_contacts',{headers:{origin:'https://evil.invalid'}})).status,403);
- assert.equal((await request('/rest/v1/cop_contacts',{method:'OPTIONS',headers:{origin:'https://allowed.invalid'}})).status,204);
+ const preflight=await request('/rest/v1/rpc/cop_session_valid',{method:'OPTIONS',headers:{origin:'https://allowed.invalid','Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'apikey,authorization,content-type,content-profile,x-client-info'}});
+ assert.equal(preflight.status,204);
+ const allowedHeaders=preflight.headers.get('access-control-allow-headers').split(',').map(s=>s.trim());
+ assert.ok(allowedHeaders.includes('content-profile'),'Supabase RPC headers must pass browser CORS');
+ assert.ok(allowedHeaders.includes('accept-profile'),'Supabase table reads must pass browser CORS');
  assert.equal((await request('/auth/v1/user',{method:'PUT',body:'{}'})).status,403);
  assert.equal((await request('/auth/v1/signup',{method:'POST',body:'{}'})).status,404);
  assert.equal((await request('/auth/v1/admin/users',{method:'GET'})).status,404);
