@@ -80,6 +80,17 @@ export function parseCsv(text) {
   row.push(cell.trim());if(row.some(Boolean)) rows.push(row);
   return rows;
 }
+function parseImportDate(value) {
+ const v=String(value||'').trim();
+ if(!v)return null;
+ let iso=v;
+ const br=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+ if(br)iso=br[3]+'-'+br[2]+'-'+br[1];
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return '';
+ const d=new Date(iso+'T00:00:00Z');
+ return Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==iso?'':iso;
+}
+
 export function parseTables(tables) {
   const valid=[];const errors=[];
   for (const table of tables) {
@@ -107,6 +118,10 @@ export function parseTables(tables) {
       if(!explicit) rowErrors.push('Cluster ausente ou ambíguo');
       if(!entry.nome) rowErrors.push('Nome obrigatório');
       if(!phone.valid) rowErrors.push(phone.error);
+      const start=parseImportDate(entry.inicio);
+      const end=parseImportDate(entry.fim);
+      if(start===''||end==='')rowErrors.push('Data de vigência inválida');
+      if(start&&end&&start>end)rowErrors.push('Vigência inicial posterior à final');
       if(rowErrors.length){
         errors.push({sheet:table.sheet,row:i+1,message:rowErrors.join('; ')});
         continue;
@@ -117,7 +132,7 @@ export function parseTables(tables) {
         nivel:entry.nivel || '', phone_e164:phone.e164, phone_display:phone.display,
         notes:entry.observacoes || '',
         scope:normalizeText(entry.abrangencia).includes('regional') || !entry.cidade ? 'regional' : 'local',
-        valid_from:entry.inicio || null,valid_until:entry.fim || null,active:true
+        valid_from:start,valid_until:end,active:true
       });
     }
   }

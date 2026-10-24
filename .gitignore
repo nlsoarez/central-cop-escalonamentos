@@ -1,0 +1,7 @@
+# Configuração privada/ambiente. Nunca colocar service_role no frontend.
+config.js
+.env
+.env.*
+node_modules/
+.DS_Store
+*.log
