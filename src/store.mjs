@@ -25,14 +25,53 @@ export const store={
   async session(){
     if(!client)return null;
     const {data,error}=await client.auth.getUser();if(error||!data.user)return null;
-    const profile=expect(await client.from('cop_profiles').select('id,display_name,role,active').eq('id',data.user.id).maybeSingle());
+    const profile=expect(await client.from('cop_profiles').select('id,login_id,display_name,role,active,must_change_password').eq('id',data.user.id).maybeSingle());
     if(!profile?.active) return {id:data.user.id,email:data.user.email,role:'pending',display_name:data.user.email,active:false};
     return {...profile,email:data.user.email};
   },
-  async signIn(email,password){
+  async signIn(identifier,password){
     if(!client)throw Error('Configure um Supabase independente para ativar o login.');
+    const login=String(identifier||'').trim().toUpperCase();
+    const email=login.includes('@') ? String(identifier).trim().toLowerCase() :
+      login.toLowerCase() + '@users.central-cop.invalid';
+    // Alias interno na autenticação; senhas nunca são mantidas no navegador pelo portal.
     expect(await client.auth.signInWithPassword({email,password}));
     return this.session();
+  },
+  async invoke(name,body){
+    if(!client)throw Error('Banco independente ainda não configurado.');
+    const {data,error}=await client.functions.invoke(name,{body});
+    if(error){
+      let detail='';
+      try{detail=(await error.context?.json())?.error||'';}catch{}
+      throw Error(detail||error.message||'Falha no serviço.');
+    }
+    if(data?.error)throw Error(data.error);
+    return data;
+  },
+  async changePassword(currentPassword,newPassword){
+    return this.invoke('cop-change-password',{currentPassword,newPassword});
+  },
+  async users(){
+    if(!client)return [];
+    return expect(await client.from('cop_profiles')
+      .select('id,login_id,display_name,role,active,must_change_password')
+      .order('display_name',{ascending:true}));
+  },
+  async createUsers(users,onProgress=()=>{}){
+    const results=[];
+    for(let i=0;i<users.length;i+=20){
+      const response=await this.invoke('cop-manage-users',{action:'create',users:users.slice(i,i+20)});
+      results.push(...(response.results||[]));
+      onProgress([...results]);
+    }
+    return results;
+  },
+  async resetUserPassword(userId){
+    return this.invoke('cop-manage-users',{action:'reset',userId});
+  },
+  async setUserActive(userId,active){
+    return this.invoke('cop-manage-users',{action:'set_active',userId,active});
   },
   async signOut(){if(client)expect(await client.auth.signOut());},
   async contacts(){

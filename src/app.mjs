@@ -1,5 +1,6 @@
 import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,parseTables,filterContacts,importPreview,isCurrentValidity} from './core.mjs';
 import {store} from './store.mjs';
+import {parseRoster} from './users.mjs';
 
 const root=document.getElementById('app');
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
@@ -29,13 +30,13 @@ const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const userIsAdmin=()=>state.user?.active&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
-const state={user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:storage('cop-favorites',[]),recent:storage('cop-recent',[]),upload:null,importMode:'merge',batches:[],modal:null,notice:'',busy:false};
+const state={user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:storage('cop-favorites',[]),recent:storage('cop-recent',[]),upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 const toast=(message,kind='info')=>{state.notice={message,kind};render();setTimeout(()=>{if(state.notice?.message===message){state.notice='';render();}},4500);};
 function navButton(page,title,iconName){
   return '<button type="button" class="nav-link '+(state.view===page?'active':'')+'" data-action="nav" data-page="'+page+'">'+ic(iconName)+'<span>'+title+'</span></button>';
 }
 function topTitle(){
-  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',nice:'Integração NICE MAX'})[state.view]||'Central COP';
+  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',usuarios:'Gestão de usuários',nice:'Integração NICE MAX'})[state.view]||'Central COP';
 }
 function uiHeader(){
   const stamp=state.contacts.map(c=>c.updated_at||'').filter(Boolean).sort().at(-1);
@@ -46,7 +47,7 @@ function uiHeader(){
 function renderShell(){
  const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+
  '<div class="nav-divider"></div>'+navButton('nice','NICE MAX','phone')+
- (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload'):'');
+ (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'');
  return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+ic('bolt',27)+'</div><div><strong>Central COP</strong><small>ESCALONAMENTOS</small></div></div><nav aria-label="Menu principal">'+nav+'</nav><div class="sidebar-foot">'+ic('info')+'<span>Consulta operacional<br><small>Fonte: diretório cadastrado</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
  (state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'')+(state.modal?renderModal():'');
 }
@@ -94,7 +95,7 @@ function favoritesPage(){const list=state.favorites.map(id=>state.contacts.find(
 function recentPage(){return '<div class="standalone"><p class="section-description">Pesquisas recentes salvas somente neste dispositivo.</p><div class="panel">'+(state.recent.length?state.recent.map(item=>'<button class="recent-item" data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster)+'">'+ic('clock')+'<span><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></span>'+ic('chevron')+'</button>').join(''):'<p class="panel-hint">Ainda não há consultas recentes.</p>')+'</div></div>';}
 function adminPage(){
  if(!userIsAdmin())return '<div class="empty">Acesso restrito.</div>';
- return '<div class="standalone"><div class="admin-banner"><div><h3>Gestão do diretório</h3><p>Gerencie responsáveis, regiões e publicações. As alterações ficam registradas no banco.</p></div><button class="btn primary" data-action="new">'+ic('edit')+' Adicionar contato</button></div><div class="admin-grid"><button data-action="nav" data-page="importar" class="admin-tile">'+ic('upload',26)+'<strong>Importar arquivo</strong><span>Excel / CSV com conferência</span></button><button data-action="new" class="admin-tile">'+ic('users',26)+'<strong>Editar contato</strong><span>Cadastro individual e atualização</span></button><button data-action="nav" data-page="diretorio" class="admin-tile">'+ic('search',26)+'<strong>Consultar diretório</strong><span>'+state.contacts.length+' contatos disponíveis</span></button></div><h3 class="subheading">Últimas importações</h3>'+renderBatches()+'</div>';
+ return '<div class="standalone"><div class="admin-banner"><div><h3>Gestão do diretório</h3><p>Gerencie responsáveis, regiões e publicações. As alterações ficam registradas no banco.</p></div><button class="btn primary" data-action="new">'+ic('edit')+' Adicionar contato</button></div><div class="admin-grid"><button data-action="nav" data-page="importar" class="admin-tile">'+ic('upload',26)+'<strong>Importar arquivo</strong><span>Excel / CSV com conferência</span></button><button data-action="new" class="admin-tile">'+ic('users',26)+'<strong>Editar contato</strong><span>Cadastro individual e atualização</span></button><button data-action="nav" data-page="diretorio" class="admin-tile">'+ic('search',26)+'<strong>Consultar diretório</strong><span>'+state.contacts.length+' contatos disponíveis</span></button><button data-action="nav" data-page="usuarios" class="admin-tile">'+ic('users',26)+'<strong>Usuários e senhas</strong><span>Cadastro com matrícula individual</span></button></div><h3 class="subheading">Últimas importações</h3>'+renderBatches()+'</div>';
 }
 function renderBatches(){
  if(!state.batches.length)return '<div class="panel"><p class="panel-hint">Nenhuma importação registrada no banco.</p></div>';
@@ -116,7 +117,28 @@ function importPage(){
  return '<div class="standalone"><div class="panel import-intro"><h3>'+ic('upload')+' Importação segura</h3><p>Envie Excel (.xlsx / .xls) ou CSV. O sistema valida nomes, telefones e clusters, calcula as mudanças e só publica com confirmação. Não deduz clusters pela ordem das abas.</p><label class="file-pick">Selecionar planilha<input type="file" id="importFile" accept=".csv,.xlsx,.xls" '+(state.busy?'disabled':'')+'/></label><p class="panel-hint">Máximo recomendado: 5 MB e 2.000 contatos. Cluster obrigatório em coluna ou nome da aba. Não envie dados de produção antes de configurar o banco independente.</p></div>'+preview+'<h3 class="subheading">Histórico de versões</h3>'+renderBatches()+'</div>';
 }
 function nicePage(){return '<div class="standalone"><div class="panel integration"><div class="integration-icon">'+ic('phone',35)+'</div><div><h3>Discagem via NICE MAX</h3><p>A interface está preparada para oferecer o botão <strong>Ligar via MAX</strong> ao lado do WhatsApp. A conexão <strong>não está ativa</strong>: depende de autorização, autenticação de agente, identificação de sessão e API liberada pela administração do NICE na Claro.</p><p>Não inserimos credenciais do MAX nem simulamos chamadas. Até a homologação, utilize WhatsApp ou copie o telefone.</p><span class="tag warn">Integração pendente</span></div></div></div>';}
-function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,nice:nicePage})[state.view]?.()||consultation();}
+function usersPage(){
+ if(!userIsAdmin())return '<div class="empty">Acesso restrito.</div>';
+ const validated=state.roster;
+ const users=state.accounts.filter(x=>x.login_id);
+ const ready=validated&&validated.data.length>0&&validated.errors.length===0;
+ const credentials=state.credentials;
+ const credsHtml=credentials.length?
+  '<section class="panel credentials" aria-label="Senhas provisórias"><h3>'+ic('alert')+' Credenciais geradas — visualização temporária</h3><p>As senhas são <strong>individuais</strong>, geradas aleatoriamente e deverão ser trocadas no primeiro acesso. Não são salvas no portal. Entregue cada senha exclusivamente ao seu titular por canal seguro. Caso perca uma senha, utilize Redefinir.</p><div class="toolbar"><button class="btn subtle" data-action="export-credentials">Exportar CSV confidencial</button><button class="btn subtle" data-action="clear-credentials">Apagar senhas da tela</button></div><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Senha provisória</th></tr></thead><tbody>'+
+  credentials.map(u=>'<tr><td><strong>'+h(u.login)+'</strong></td><td>'+h(u.nome)+'</td><td>'+h(({created:'Criado',exists:'Já cadastrado',error:'Erro'})[u.status]||'Desconhecido')+'</td><td>'+(u.temporaryPassword?'<code>'+h(u.temporaryPassword)+'</code> <button class="icon-btn" data-action="copy-password" data-login="'+h(u.login)+'" title="Copiar senha">'+ic('copy')+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div></section>':'';
+ return '<div class="standalone"><section class="panel users-intro"><h3>'+ic('users')+' Contas individuais</h3><p>O acesso será realizado por <strong>matrícula + senha pessoal</strong>. Cada usuário recebe uma senha provisória exclusiva e precisará substituí-la no primeiro login. A senha definitiva fica protegida pelo Supabase Auth. Matrículas e nomes não são publicados no GitHub.</p><p class="panel-hint">Cadastro restrito ao administrador. O portal e a autenticação são independentes do SIM.</p></section>'+
+ '<section class="panel roster-panel"><h3>Importar usuários</h3><p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
+ (validated?'<p><strong>'+validated.data.length+'</strong> matrícula(s) válidas e <strong>'+validated.errors.length+'</strong> inconsistência(s).</p>'+
+ (validated.errors.length?'<div class="error-list"><ul>'+validated.errors.slice(0,12).map(x=>'<li>Linha '+x.line+': '+h(x.message)+'</li>').join('')+'</ul></div>':'')+
+ '<div class="table-overflow"><table class="preview-table"><thead><tr><th>Matrícula</th><th>Nome</th></tr></thead><tbody>'+validated.data.slice(0,12).map(x=>'<tr><td>'+h(x.login)+'</td><td>'+h(x.nome)+'</td></tr>').join('')+'</tbody></table></div><p class="panel-hint">Visualização parcial de até 12 registros.</p>':'')+'</section>'+
+ credsHtml+
+ '<h3 class="subheading">Usuários cadastrados ('+users.length+')</h3><div class="panel"><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>LOGIN</th><th>Nome</th><th>Perfil</th><th>Acesso</th><th>Senha</th><th>Ações</th></tr></thead><tbody>'+
+ (users.length?users.map(u=>'<tr><td><strong>'+h(u.login_id)+'</strong></td><td>'+h(u.display_name)+'</td><td>'+h(u.role)+'</td><td><span class="tag '+(u.active?'blue':'warn')+'">'+(u.active?'Ativo':'Inativo')+'</span></td><td>'+ (u.must_change_password?'Troca pendente':'Pessoal')+'</td><td><button class="btn subtle" data-action="reset-account" data-id="'+h(u.id)+'" '+(u.role!=='viewer'?'disabled':'')+'>Redefinir</button> <button class="btn subtle" data-action="toggle-account" data-id="'+h(u.id)+'" data-active="'+(u.active?'false':'true')+'" '+(u.role!=='viewer'?'disabled':'')+'>'+(u.active?'Desativar':'Ativar')+'</button></td></tr>').join(''):'<tr><td colspan="6">Nenhum usuário provisionado.</td></tr>')+'</tbody></table></div></div></div>';
+}
+function passwordChangeView(){
+ return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',34)+'</div><span class="overline">PRIMEIRO ACESSO</span><h1>Crie sua senha</h1><p>Por segurança, substitua sua senha provisória antes de consultar os contatos de escalonamento.</p><form id="changePasswordForm"><label>Senha provisória atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
+}
+function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage,nice:nicePage})[state.view]?.()||consultation();}
 function renderModal(){
  const c=state.modal==='new'?{}:state.contacts.find(item=>item.id===state.modal)||{};
  const textInput=(name,label,val,required='')=>'<label class="field"><span>'+label+'</span><input name="'+name+'" value="'+h(val||'')+'" '+required+'/></label>';
@@ -124,20 +146,24 @@ function renderModal(){
  return '<div class="modal-backdrop" data-action="close-modal"><div class="modal-card" role="dialog" aria-modal="true" aria-label="Editar contato"><div class="modal-top"><h3>'+(c.id?'Editar contato':'Novo contato')+'</h3><button class="icon-btn" data-action="close-modal" aria-label="Fechar">×</button></div><form id="contactForm" class="edit-grid">'+select('cluster','Cluster',CLUSTERS,c.cluster||'RJ')+textInput('area','Área',c.area)+textInput('cidade','Cidade / Localidade',c.cidade)+textInput('topologia','Topologia',c.topologia)+textInput('full_name','Nome completo',c.full_name,'required')+textInput('cargo','Cargo',c.cargo)+textInput('nivel','Nível de escalonamento',c.nivel)+textInput('phone_e164','Telefone com DDD',c.phone_display||c.phone_e164,'required')+select('scope','Abrangência',['local','regional'],c.scope||'local')+textInput('notes','Observações',c.notes)+textInput('valid_from','Válido a partir de (AAAA-MM-DD)',c.valid_from)+textInput('valid_until','Válido até (AAAA-MM-DD)',c.valid_until)+'<label class="check-field"><input type="checkbox" name="active" '+(c.active!==false?'checked':'')+'/> Contato ativo</label><div class="modal-actions"><button type="button" class="btn subtle" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary" '+(state.busy?'disabled':'')+'>Salvar contato</button></div></form></div></div>';
 }
 function loginView(){
- return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',36)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>E-mail corporativo<input type="email" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
+ return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',36)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>Matrícula ou e-mail de administrador<input type="text" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
 }
 function render(){
  if(state.loading){root.innerHTML='<div class="loading">'+ic('refresh',34)+' Carregando Central COP...</div>';return;}
+ if(store.configured && state.user?.active && state.user.must_change_password){root.innerHTML=passwordChangeView();return;}
  if(store.configured && !state.user?.active){root.innerHTML=state.user?.role==='pending'?'<div class="auth-screen"><div class="auth-card"><h2>Acesso pendente</h2><p>Seu usuário ainda não foi liberado. Procure o administrador.</p><button class="btn primary" data-action="logout">Sair</button></div></div>':loginView();return;}
  root.innerHTML=renderShell();
 }
 async function refresh(){
  state.contacts=await store.contacts();
- if(userIsAdmin())state.batches=await store.batches();
+ if(userIsAdmin()){
+   const [batches,accounts]=await Promise.all([store.batches(),store.users()]);
+   state.batches=batches;state.accounts=accounts;
+ }
  render();
 }
 async function init(){
- try{state.user=await store.session();if(store.demo||state.user?.active)await refresh();}
+ try{state.user=await store.session();if(store.demo||(state.user?.active&&!state.user.must_change_password))await refresh();}
  catch(e){state.notice={message:'Falha ao carregar dados: '+e.message,kind:'error'};}
  finally{state.loading=false;render();}
 }
@@ -159,8 +185,26 @@ root.addEventListener('submit',async e=>{
  }
  if(e.target.id==='loginForm'){
   e.preventDefault();const f=new FormData(e.target);
-  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));if(state.user?.active)await refresh();else render();}
+  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
   catch(err){toast('Login falhou: '+err.message,'error');}return;
+ }
+ if(e.target.id==='changePasswordForm'){
+  e.preventDefault();
+  if(state.busy)return;
+  const form=new FormData(e.target);
+  const current=String(form.get('currentPassword')||'');
+  const next=String(form.get('newPassword')||'');
+  if(next!==String(form.get('confirmation')||'')){toast('As senhas não coincidem.','error');return;}
+  if(next.length<12||next===current){toast('Escolha uma senha diferente com pelo menos 12 caracteres.','error');return;}
+  state.busy=true;
+  try{
+    await store.changePassword(current,next);
+    state.user=await store.session();
+    if(!state.user?.active||state.user.must_change_password)throw Error('A liberação da conta ainda está pendente.');
+    await refresh();toast('Senha pessoal definida com sucesso.','success');
+  }catch(err){toast('Falha na troca: '+err.message,'error');}
+  finally{state.busy=false;}
+  return;
  }
  if(e.target.id==='contactForm'){
   e.preventDefault();if(state.busy)return;
@@ -208,7 +252,76 @@ root.addEventListener('click',async e=>{
  }
  const action=btn.dataset.action;
  if(!action)return;
- if(action==='nav'){state.view=btn.dataset.page;render();return;}
+ if(action==='nav'){
+  if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
+    state.credentials=[];state.roster=null;state.rosterRaw='';
+  }
+  state.view=btn.dataset.page;render();return;
+ }
+ if(action==='validate-roster'){
+  if(!userIsAdmin())return;
+  const text=document.getElementById('rosterText')?.value||'';
+  const parsed=parseRoster(text);
+  if(parsed.data.length>100){toast('Limite de 100 pessoas por importação.','error');return;}
+  state.roster=parsed;state.rosterRaw=text;
+  render();return;
+ }
+ if(action==='create-roster'){
+  if(!userIsAdmin()||state.busy||!state.roster?.data?.length||state.roster.errors.length)return;
+  if(!confirm('Criar contas individuais com senhas provisórias aleatórias? As credenciais só serão exibidas nesta sessão.'))return;
+  state.busy=true;state.credentials=[];render();
+  try {
+    const result=await store.createUsers(state.roster.data,rows=>{state.credentials=[...rows];render();});
+    state.credentials=result;state.roster=null;state.rosterRaw='';await refresh();
+    toast('Cadastro finalizado. Confira os resultados e distribua as senhas individualmente.','success');
+  }catch(err){toast('Falha durante a criação. Contas já cadastradas foram preservadas. '+err.message,'error');}
+  finally{state.busy=false;render();}
+  return;
+ }
+ if(action==='copy-password'){
+  const entry=state.credentials.find(x=>x.login===btn.dataset.login);
+  if(entry?.temporaryPassword){try{await copyText(entry.temporaryPassword);toast('Senha provisória copiada.','success');}catch{toast('Não foi possível copiar.','error');}}
+  return;
+ }
+ if(action==='clear-credentials'){
+  state.credentials=[];render();toast('Senhas provisórias retiradas da tela.','success');return;
+ }
+ if(action==='export-credentials'){
+  if(!state.credentials.length)return;
+  const quote=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
+  const csv='LOGIN;NOME;SENHA_PROVISORIA;STATUS\r\n'+state.credentials.map(x=>[x.login,x.nome,x.temporaryPassword||'',x.status].map(quote).join(';')).join('\r\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='central-cop-credenciais-confidencial.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+  toast('Arquivo gerado localmente. Guarde em local protegido e exclua após distribuir as senhas.','info');return;
+ }
+ if(action==='reset-account'){
+  if(!userIsAdmin()||state.busy)return;
+  const profile=state.accounts.find(x=>x.id===btn.dataset.id);
+  if(!profile||profile.role!=='viewer')return;
+  if(!confirm('Gerar uma NOVA senha provisória para '+profile.login_id+'? A senha anterior deixará de funcionar.'))return;
+  state.busy=true;
+  try{
+    const reply=await store.resetUserPassword(profile.id);
+    state.credentials=[{login:profile.login_id,nome:profile.display_name,status:'created',temporaryPassword:reply.temporaryPassword}];
+    await refresh();toast('Senha provisória redefinida. Entregue apenas ao titular.','success');
+  }catch(err){toast('Não foi possível redefinir: '+err.message,'error');}
+  finally{state.busy=false;render();}
+  return;
+ }
+ if(action==='toggle-account'){
+  if(!userIsAdmin()||state.busy)return;
+  const profile=state.accounts.find(x=>x.id===btn.dataset.id);
+  if(!profile||profile.role!=='viewer')return;
+  const active=btn.dataset.active==='true';
+  if(!confirm((active?'Reativar':'Desativar')+' acesso de '+profile.login_id+'?'))return;
+  state.busy=true;
+  try{await store.setUserActive(profile.id,active);await refresh();toast('Acesso atualizado.','success');}
+  catch(err){toast('Falha ao alterar acesso: '+err.message,'error');}
+  finally{state.busy=false;render();}
+  return;
+ }
  if(action==='cluster'){state.filters.cluster=btn.dataset.cluster;state.filters.area='';state.filters.cidade='';state.filters.topologia='';state.filters.cargo='';state.filters.nivel='';render();return;}
  if(action==='clear'){state.filters={cluster:state.filters.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''};render();return;}
  if(action==='quick'){state.view='consultar';state.filters={...state.filters,query:'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};render();document.querySelector(btn.dataset.mode==='city'?'[data-filter="cidade"]':'[data-filter="topologia"]')?.focus();return;}
