@@ -96,3 +96,13 @@ Um backup contendo o administrador e os 58 registros foi criptografado, transfer
 A chave SSH temporária autorizada foi retirada ao concluir. A API Hostinger confirmou **as quatro chaves originais restantes**. A chave privada temporária e a cópia local de trabalho da lista de analistas também foram retiradas. As cópias criptografadas de recuperação permanecem na área privada ignorada pelo Git.
 
 Liberação operacional ainda exige ativação do administrador, criação/distribuição individual das credenciais dos analistas e importação/conferência das planilhas reais de escalonamento. Não há dados de contatos reais para validar cobertura ou hierarquia operacional. Retenção de backups, alertas de falha e homologação nos navegadores corporativos continuam como ajustes operacionais a definir.
+
+## Correção posterior do login — 24/10/2026
+
+O proprietário ativou o administrador, mas recebeu uma mensagem incorreta de possível falha de senha. Os logs mostravam Auth `/token` e `/user` com HTTP 200; na aba real, a validação posterior falhava com `Failed to fetch`.
+
+Foi reproduzido um preflight OPTIONS para o RPC de sessão: o gateway respondia 204, mas omitia `Content-Profile` e `Accept-Profile`, cabeçalhos enviados pelo SDK Supabase. O navegador bloqueava as consultas por CORS. A homologação HTTP anterior não havia coberto esses cabeçalhos específicos do SDK no navegador.
+
+O gateway passou a permiti-los, mantendo origem restrita, autenticação, RLS e os demais limites. O frontend separa falhas de conexão/validação/carregamento de senha inválida. Foram acrescentadas verificações de regressão: **52 testes aprovados**. Commit de correção: `7acb050`.
+
+Com autorização para uma nova chave temporária, foi atualizado e reiniciado somente o gateway do Central COP. Recarregada a sessão existente do proprietário, o painel abriu como administrador sem redigitar ou redefinir a senha. O frontend atualizado foi publicado na Vercel em `dpl_F2vnSC46ShjjDuXCBwXBaAAThtEG`. A nova chave temporária também foi removida, preservando as quatro originais.
