@@ -37,3 +37,7 @@ Uma falha de sintaxe no gerador privado dos dados fictícios foi corrigida duran
 CSS anterior: 22.837 bytes, 5.978 com gzip. CSS no ponto de medição da revisão: aproximadamente 30 KB, 6,8 KB com gzip. Nenhuma biblioteca nova de interface foi adicionada; a fonte Google já utilizada foi trocada por Roboto.
 
 A alteração é de apresentação. Banco, permissões, contatos, importador e autenticação permanecem com os contratos anteriores. A configuração pública do backend deve ser preservada na publicação estática, sem credenciais privadas. A reversão da interface pode usar o pacote do deployment anterior, sem alteração dos dados.
+
+## Publicação e revisão final
+
+Deployment `dpl_7KRwUEcUjMwquAaoQo9RLhthBKJr`, código `b20710d`, status READY no domínio principal. A configuração pública do backend foi preservada no pacote estático. Revisão aprovada para publicação: os ajustes encontrados em contraste de texto secundário e estilo do aviso de demonstração foram incorporados. Não foram alterados contratos de dados ou permissões.
