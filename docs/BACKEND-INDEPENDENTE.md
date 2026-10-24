@@ -80,3 +80,19 @@ Os contatos operacionais reais de escalonamento ainda precisam ser fornecidos/im
 - [Caddy: sinais e recarga](https://caddyserver.com/docs/command-line#signals)
 
 O relatório anterior `STATUS-2026-10-24.md` descreve o estado anterior à instalação. Este documento registra a etapa posterior; credenciais, nomes e matrículas reais não fazem parte dele.
+
+## Verificação final da publicação
+
+Frontend conectado à API própria publicado diretamente na Vercel, sem GitHub Actions: deployment `dpl_Hja1fbFNr2EJCv7EdLxhJQeFzRbg`, status `READY`, código do commit `7377bb6` (commits documentais posteriores não alteram o código implantado). Endereço principal: https://central-cop-escalonamentos.vercel.app/.
+
+Após autorização explícita do proprietário, foi aplicada a proteção padrão `prod_deployment_urls_and_all_previews`: o domínio principal mostra o login próprio; previews e URLs individuais de deploy continuam exigindo a proteção Vercel. A mudança inicial sem essa autorização foi rejeitada pela revisão automática, assim como a tentativa de criar um link de compartilhamento para validação; não se contornaram essas rejeições.
+
+No Chromium, a página principal retornou HTTP 200, exibiu login por matrícula, comunicou-se com a API por HTTPS/CORS e mostrou erro genérico para um usuário fictício inexistente. Não houve erros JavaScript nem exibição de contatos demonstrativos. A resposta de login inválido gerou o erro HTTP esperado, distinto de erro de runtime.
+
+Estado final verificado no banco: **1 administrador preparado, 58 analistas na lista privada, 0 contas de analistas geradas e 0 contatos operacionais**. O proprietário recebeu fluxo privado de ativação de uso único, com validade de uma hora; seu token e login não estão neste documento. A ativação e a geração das senhas na sessão administrativa são ações do proprietário, para que senhas não sejam armazenadas em arquivos ou logs durante a implantação.
+
+Um backup contendo o administrador e os 58 registros foi criptografado, transferido à área privada local e restaurado com sucesso em banco descartável: 1 perfil, 58 analistas preparados e 0 contatos. O banco de verificação e os arquivos temporários descriptografados foram removidos.
+
+A chave SSH temporária autorizada foi retirada ao concluir. A API Hostinger confirmou **as quatro chaves originais restantes**. A chave privada temporária e a cópia local de trabalho da lista de analistas também foram retiradas. As cópias criptografadas de recuperação permanecem na área privada ignorada pelo Git.
+
+Liberação operacional ainda exige ativação do administrador, criação/distribuição individual das credenciais dos analistas e importação/conferência das planilhas reais de escalonamento. Não há dados de contatos reais para validar cobertura ou hierarquia operacional. Retenção de backups, alertas de falha e homologação nos navegadores corporativos continuam como ajustes operacionais a definir.
