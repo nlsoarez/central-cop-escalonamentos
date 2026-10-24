@@ -102,3 +102,15 @@ A infraestrutura de banco e as Edge Functions são entregues como **código e mi
 
 **GitHub Actions:** os workflows da validação/publicação devem ser inspecionados; o último estado consultado antes dessa implementação apresentava falhas de inicialização. Não considere o portal publicado até um deploy bem-sucedido.
 
+
+## Ambiente de demonstração na Vercel (24/10/2026)
+
+Foi criado um projeto separado no time Vercel `nlsoarez's projects`, com uma implantação **estática** da interface em:
+
+- `https://central-cop-escalonamentos.vercel.app/`
+
+Este endereço tem dados **fictícios** e não possui Supabase configurado. O deploy da plataforma foi marcado como `READY`, porém o acesso pelo navegador pode estar sujeito à proteção Vercel Authentication e ainda requer validação funcional do proprietário.
+
+A vinculação GitHub → Vercel falhou porque a integração de login do GitHub não está habilitada para a conta Vercel. A implantação inicial foi criada diretamente com os sete arquivos de frontend, por isso **novos commits do GitHub não entram automaticamente na Vercel** até essa conexão ser concluída.
+
+Não foram enviados CSVs com dados de colaboradores para a implantação nem segredos de autenticação. Não usar para produção até que se crie um Supabase separado e sejam testadas as políticas RLS e as duas Edge Functions.
