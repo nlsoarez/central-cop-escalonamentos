@@ -2,8 +2,10 @@
 // Não utiliza quaisquer credenciais, endpoints ou tabelas do projeto SIM.
 import { createClient } from "npm:@supabase/supabase-js@2.112.3";
 
+import { DEFAULT_ORIGIN, assertSession, consumeLimit, recordAudit, revokeSessions, withAccountLock } from '../_shared/security.mjs';
+
 const ORIGINS = new Set([
-  "https://nlsoarez.github.io",
+  DEFAULT_ORIGIN,
   ...(Deno.env.get("COP_ALLOWED_ORIGINS") || "").split(",").map(s => s.trim()).filter(Boolean),
 ]);
 const loginPattern = /^[A-Z][A-Z0-9]{4,14}$/;
@@ -23,12 +25,12 @@ Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
   const allowed = !origin || ORIGINS.has(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
   const cors = {
-    "Access-Control-Allow-Origin": origin && allowed ? origin : "https://nlsoarez.github.io",
+    "Access-Control-Allow-Origin": origin && allowed ? origin : DEFAULT_ORIGIN,
     "Access-Control-Allow-Headers": "authorization, apikey, x-client-info, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
-  if (req.method === "OPTIONS") return new Response("", { status: allowed ? 204 : 403, headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: allowed ? 204 : 403, headers: cors });
   if (!allowed) return message({ error: "Origem não autorizada" }, 403, cors);
   if (req.method !== "POST") return message({ error: "Método não autorizado" }, 405, cors);
   const apiUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -45,6 +47,8 @@ Deno.serve(async (req) => {
     if (profileError || !operator?.active || operator.role !== "admin" || operator.must_change_password) {
       throw fail("Permissão de administrador necessária", 403);
     }
+    await assertSession(admin,bearer,authData.user.id);
+    await consumeLimit(admin,operator.id,'manage_users',30,60);
     const body = await req.json();
     if (body.action === "create") {
       if (!Array.isArray(body.users) || body.users.length < 1 || body.users.length > 20) {
@@ -84,6 +88,7 @@ Deno.serve(async (req) => {
           results.push({ login: entry.login, nome: entry.nome, status: "error" });
           continue;
         }
+        await recordAudit(admin,operator.id,created.user.id,'create');
         // A senha nunca é armazenada em tabela própria nem enviada a logs.
         results.push({ login: entry.login, nome: entry.nome, status: "created", temporaryPassword });
       }
@@ -93,6 +98,7 @@ Deno.serve(async (req) => {
       const targetId = String(body.userId || "");
       if (!/^[a-f0-9-]{36}$/i.test(targetId)) throw fail("Identificador inválido");
       if (targetId === operator.id) throw fail("Não é permitido alterar a própria conta por aqui");
+      return await withAccountLock(admin,targetId,async () => {
       const { data: target, error: targetError } = await admin.from("cop_profiles")
         .select("id,login_id,role,active").eq("id", targetId).single();
       if (targetError || !target) throw fail("Usuário não encontrado", 404);
@@ -100,19 +106,25 @@ Deno.serve(async (req) => {
       if (target.role !== "viewer") throw fail("Gestão de administradores bloqueada neste fluxo", 403);
       if (body.action === "set_active") {
         if (typeof body.active !== "boolean") throw fail("Status inválido");
+        // Revogar antes de reativar impede ressuscitar sessões anteriores.
+        if(body.active) await revokeSessions(admin,targetId);
         const { error } = await admin.from("cop_profiles").update({ active: body.active }).eq("id", targetId);
         if (error) throw fail("Falha ao atualizar status", 500);
+        if(!body.active) await revokeSessions(admin,targetId);
+        await recordAudit(admin,operator.id,targetId,body.active?'activate':'deactivate');
         return message({ success: true }, 200, cors);
       }
+      // Fechar acesso ANTES de trocar a senha. Qualquer falha mantém a conta restrita.
+      const {error: gateError} = await admin.from('cop_profiles')
+        .update({must_change_password:true}).eq('id',targetId).select('id').single();
+      if(gateError) throw fail('Falha ao restringir a conta',500);
+      await revokeSessions(admin,targetId);
       const temporaryPassword = newPassword();
-      const { error: passwordError } = await admin.auth.admin.updateUserById(targetId, {
-        password: temporaryPassword
-      });
-      if (passwordError) throw fail("Falha ao redefinir a senha", 500);
-      const { error: profileUpdateError } = await admin.from("cop_profiles")
-        .update({ must_change_password: true }).eq("id", targetId);
-      if (profileUpdateError) throw fail("Falha ao exigir alteração de senha; suspenda a conta e tente novamente", 500);
+      const {error: passwordError} = await admin.auth.admin.updateUserById(targetId,{password:temporaryPassword});
+      if(passwordError) throw fail('Falha ao redefinir a senha',500);
+      await recordAudit(admin,operator.id,targetId,'reset');
       return message({ login: target.login_id, temporaryPassword }, 200, cors);
+      });
     }
     throw fail("Ação não reconhecida");
   } catch (error) {

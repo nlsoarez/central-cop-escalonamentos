@@ -17,14 +17,22 @@ const configured=Boolean(setting.supabaseUrl && setting.supabaseAnonKey);
 const client=(configured && window.supabase?.createClient)
   ? window.supabase.createClient(setting.supabaseUrl,setting.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true}})
   : null;
+// Falha de dependência/configuração não pode mudar um ambiente real para demo.
+const configurationError = configured && !client
+  ? 'Não foi possível carregar a autenticação. Recarregue ou contate o administrador.'
+  : Boolean(setting.supabaseUrl) !== Boolean(setting.supabaseAnonKey)
+    ? 'Configuração incompleta da autenticação. Contate o administrador.' : '';
 const expect = ({data,error}) => {if(error)throw error;return data;};
 export const store={
-  configured:Boolean(client),
-  demo:!client,
+  configured:configured || Boolean(configurationError),
+  configurationError,
+  demo:!client && !configurationError,
   demoContacts:DEMO_CONTACTS.map(c=>({...c})),
   async session(){
     if(!client)return null;
     const {data,error}=await client.auth.getUser();if(error||!data.user)return null;
+    const valid=expect(await client.rpc('cop_session_valid'));
+    if(!valid){await client.auth.signOut({scope:'local'});return null;}
     const profile=expect(await client.from('cop_profiles').select('id,login_id,display_name,role,active,must_change_password').eq('id',data.user.id).maybeSingle());
     if(!profile?.active) return {id:data.user.id,email:data.user.email,role:'pending',display_name:data.user.email,active:false};
     return {...profile,email:data.user.email};
@@ -57,6 +65,10 @@ export const store={
     return expect(await client.from('cop_profiles')
       .select('id,login_id,display_name,role,active,must_change_password')
       .order('display_name',{ascending:true}));
+  },
+  async userAudit(){
+    if(!client)return [];
+    return expect(await client.from('cop_user_audit').select('id,actor,target,event,created_at').order('created_at',{ascending:false}).limit(100));
   },
   async createUsers(users,onProgress=()=>{}){
     const results=[];

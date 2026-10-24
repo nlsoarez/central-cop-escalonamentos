@@ -27,11 +27,16 @@ const iconPaths={
 };
 const ic=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(iconPaths[name]||iconPaths.info)+'</svg>';
 const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const userIsAdmin=()=>state.user?.active&&state.user?.role==='admin';
+const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
-const state={user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:storage('cop-favorites',[]),recent:storage('cop-recent',[]),upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
-const toast=(message,kind='info')=>{state.notice={message,kind};render();setTimeout(()=>{if(state.notice?.message===message){state.notice='';render();}},4500);};
+const state={user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
+const toast=(message,kind='info')=>{
+ state.notice={message,kind};
+ root.querySelectorAll('.toast').forEach(el=>el.remove());
+ root.insertAdjacentHTML('beforeend','<div class="toast '+h(kind)+'" role="status">'+h(message)+'</div>');
+ setTimeout(()=>{if(state.notice?.message===message){state.notice='';root.querySelectorAll('.toast').forEach(el=>el.remove());}},4500);
+};
 function navButton(page,title,iconName){
   return '<button type="button" class="nav-link '+(state.view===page?'active':'')+'" data-action="nav" data-page="'+page+'">'+ic(iconName)+'<span>'+title+'</span></button>';
 }
@@ -41,7 +46,7 @@ function topTitle(){
 function uiHeader(){
   const stamp=state.contacts.map(c=>c.updated_at||'').filter(Boolean).sort().at(-1);
   const date=stamp?new Date(stamp).toLocaleString('pt-BR'):'Não disponível';
-  return '<header class="topbar"><div class="brand-mini">'+ic('bolt',23)+' <strong>Central COP</strong><span> / ESCALONAMENTOS</span></div><div class="top-actions"><span class="status-pill '+(store.demo?'demo':'live')+'"><i></i>'+(store.demo?'DEMONSTRAÇÃO':'BASE CONECTADA')+'</span><div class="avatar" title="'+h(state.user?.email||'Modo demonstração')+'">'+h((state.user?.display_name||'COP').slice(0,2).toUpperCase())+'</div><span class="user-name">'+h(state.user?.display_name||'Demonstração')+'</span>'+(store.configured?'<button class="icon-btn" data-action="logout" title="Sair">'+ic('logout')+'</button>':'')+'</div></header>'+
+  return '<header class="topbar"><div class="brand-mini">'+ic('bolt',23)+' <strong>Central COP</strong><span> / ESCALONAMENTOS</span></div><div class="top-actions"><span class="status-pill '+(store.demo?'demo':'live')+'"><i></i>'+(store.demo?'DEMONSTRAÇÃO':'BASE CONECTADA')+'</span><div class="avatar" title="'+h(state.user?.email||'Modo demonstração')+'">'+h((state.user?.display_name||'COP').slice(0,2).toUpperCase())+'</div><span class="user-name">'+h(state.user?.display_name||'Demonstração')+'</span>'+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button><button class="icon-btn" data-action="logout" title="Sair">'+ic('logout')+'</button>':'')+'</div></header>'+
   '<section class="hero"><div class="eyebrow">OPERAÇÃO DE REDE · CONSULTA DE CONTATOS</div><h1>Central COP</h1><div class="hero-sub">ESCALONAMENTOS</div><p>Encontre o responsável certo e acione o próximo nível com agilidade.</p><span class="hero-data">Última atualização: '+h(date)+'</span></section>';
 }
 function renderShell(){
@@ -85,7 +90,7 @@ function rightPanel(){
 }
 function consultation(){
  const visible=filterContacts(state.contacts,state.filters);
- return '<div class="workspace"><div class="primary-column">'+filterUI()+'<div class="results-heading"><div>'+ic('map',20)+'<h3>Escalonamento '+(state.filters.cluster?'— '+state.filters.cluster:'— Todos os clusters')+'</h3></div><span>Localidade: '+h(state.filters.cidade||'Todas')+'</span></div>'+contactList(visible)+'</div>'+rightPanel()+'</div>';
+ return '<div class="workspace"><div class="primary-column">'+filterUI()+'<div class="results-heading"><div>'+ic('map',20)+'<h3>Escalonamento '+(state.filters.cluster?'— '+h(state.filters.cluster):'— Todos os clusters')+'</h3></div><span>Localidade: '+h(state.filters.cidade||'Todas')+'</span></div>'+contactList(visible)+'</div>'+rightPanel()+'</div>';
 }
 function directory(){
  const visible=filterContacts(state.contacts,{...state.filters,cluster:'',area:'',cidade:'',nivel:'',cargo:'',topologia:'',includeInactive:userIsAdmin()});
@@ -124,7 +129,7 @@ function usersPage(){
  const ready=validated&&validated.data.length>0&&validated.errors.length===0;
  const credentials=state.credentials;
  const credsHtml=credentials.length?
-  '<section class="panel credentials" aria-label="Senhas provisórias"><h3>'+ic('alert')+' Credenciais geradas — visualização temporária</h3><p>As senhas são <strong>individuais</strong>, geradas aleatoriamente e deverão ser trocadas no primeiro acesso. Não são salvas no portal. Entregue cada senha exclusivamente ao seu titular por canal seguro. Caso perca uma senha, utilize Redefinir.</p><div class="toolbar"><button class="btn subtle" data-action="export-credentials">Exportar CSV confidencial</button><button class="btn subtle" data-action="clear-credentials">Apagar senhas da tela</button></div><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Senha provisória</th></tr></thead><tbody>'+
+  '<section class="panel credentials" aria-label="Senhas provisórias"><h3>'+ic('alert')+' Credenciais geradas — visualização temporária</h3><p>As senhas são <strong>individuais</strong>, geradas aleatoriamente e deverão ser trocadas no primeiro acesso. Não são salvas no portal. Entregue cada senha exclusivamente ao seu titular por canal seguro. Caso perca uma senha, utilize Redefinir.</p><div class="toolbar"><button class="btn subtle" data-action="clear-credentials">Apagar senhas da tela</button></div><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Senha provisória</th></tr></thead><tbody>'+
   credentials.map(u=>'<tr><td><strong>'+h(u.login)+'</strong></td><td>'+h(u.nome)+'</td><td>'+h(({created:'Criado',exists:'Já cadastrado',error:'Erro'})[u.status]||'Desconhecido')+'</td><td>'+(u.temporaryPassword?'<code>'+h(u.temporaryPassword)+'</code> <button class="icon-btn" data-action="copy-password" data-login="'+h(u.login)+'" title="Copiar senha">'+ic('copy')+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div></section>':'';
  return '<div class="standalone"><section class="panel users-intro"><h3>'+ic('users')+' Contas individuais</h3><p>O acesso será realizado por <strong>matrícula + senha pessoal</strong>. Cada usuário recebe uma senha provisória exclusiva e precisará substituí-la no primeiro login. A senha definitiva fica protegida pelo Supabase Auth. Matrículas e nomes não são publicados no GitHub.</p><p class="panel-hint">Cadastro restrito ao administrador. O portal e a autenticação são independentes do SIM.</p></section>'+
  '<section class="panel roster-panel"><h3>Importar usuários</h3><p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="file-pick">Selecionar CSV de usuários<input type="file" id="usersImportFile" accept=".csv,.txt" '+(state.busy?'disabled':'')+'/></label><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
@@ -135,8 +140,13 @@ function usersPage(){
  '<h3 class="subheading">Usuários cadastrados ('+users.length+')</h3><div class="panel"><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>LOGIN</th><th>Nome</th><th>Perfil</th><th>Acesso</th><th>Senha</th><th>Ações</th></tr></thead><tbody>'+
  (users.length?users.map(u=>'<tr><td><strong>'+h(u.login_id)+'</strong></td><td>'+h(u.display_name)+'</td><td>'+h(u.role)+'</td><td><span class="tag '+(u.active?'blue':'warn')+'">'+(u.active?'Ativo':'Inativo')+'</span></td><td>'+ (u.must_change_password?'Troca pendente':'Pessoal')+'</td><td><button class="btn subtle" data-action="reset-account" data-id="'+h(u.id)+'" '+(u.role!=='viewer'?'disabled':'')+'>Redefinir</button> <button class="btn subtle" data-action="toggle-account" data-id="'+h(u.id)+'" data-active="'+(u.active?'false':'true')+'" '+(u.role!=='viewer'?'disabled':'')+'>'+(u.active?'Desativar':'Ativar')+'</button></td></tr>').join(''):'<tr><td colspan="6">Nenhum usuário provisionado.</td></tr>')+'</tbody></table></div></div></div>';
 }
+function renderUserAudit(){
+ const events={create:'Conta criada',reset:'Senha redefinida',activate:'Acesso reativado',deactivate:'Acesso bloqueado',change_password:'Senha pessoal alterada'};
+ const identity=id=>state.accounts.find(u=>u.id===id)?.login_id||id;
+ return '<h3 class="subheading">Histórico administrativo</h3><div class="panel"><div class="table-overflow"><table class="preview-table"><thead><tr><th>Data</th><th>Operador</th><th>Conta</th><th>Ação</th></tr></thead><tbody>'+(state.audit||[]).map(a=>'<tr><td>'+h(new Date(a.created_at).toLocaleString('pt-BR'))+'</td><td>'+h(identity(a.actor))+'</td><td>'+h(identity(a.target))+'</td><td>'+h(events[a.event]||a.event)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
 function passwordChangeView(){
- return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',34)+'</div><span class="overline">PRIMEIRO ACESSO</span><h1>Crie sua senha</h1><p>Por segurança, substitua sua senha provisória antes de consultar os contatos de escalonamento.</p><form id="changePasswordForm"><label>Senha provisória atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
+ return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',34)+'</div><span class="overline">SENHA PESSOAL</span><h1>Altere sua senha</h1><p>Informe a senha atual e escolha uma nova senha pessoal. No primeiro acesso, esta troca é obrigatória.</p><form id="changePasswordForm"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
 }
 function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage,nice:nicePage})[state.view]?.()||consultation();}
 function renderModal(){
@@ -148,31 +158,41 @@ function renderModal(){
 function loginView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',36)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>Matrícula ou e-mail de administrador<input type="text" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
 }
+function clearPrivateState(){
+ state.sessionEpoch=(state.sessionEpoch||0)+1;
+ state.user=null;state.contacts=[];state.accounts=[];state.batches=[];state.audit=[];state.upload=null;
+ state.credentials=[];state.roster=null;state.rosterRaw='';state.modal=null;state.view='consultar';
+ state.recent=[];state.favorites=[];
+}
+const authNotice=()=>state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'';
 function render(){
+ if(store.configurationError){root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>Serviço indisponível</h1><p>'+h(store.configurationError)+'</p></div></div>';return;}
  if(state.loading){root.innerHTML='<div class="loading">'+ic('refresh',34)+' Carregando Central COP...</div>';return;}
- if(store.configured && state.user?.active && state.user.must_change_password){root.innerHTML=passwordChangeView();return;}
- if(store.configured && !state.user?.active){root.innerHTML=state.user?.role==='pending'?'<div class="auth-screen"><div class="auth-card"><h2>Acesso pendente</h2><p>Seu usuário ainda não foi liberado. Procure o administrador.</p><button class="btn primary" data-action="logout">Sair</button></div></div>':loginView();return;}
+ if(store.configured && state.user?.active && (state.user.must_change_password||state.view==='senha')){root.innerHTML=passwordChangeView()+authNotice();return;}
+ if(store.configured && !state.user?.active){root.innerHTML=state.user?.role==='pending'?'<div class="auth-screen"><div class="auth-card"><h2>Acesso pendente</h2><p>Seu usuário ainda não foi liberado. Procure o administrador.</p><button class="btn primary" data-action="logout">Sair</button></div></div>':loginView();root.insertAdjacentHTML('beforeend',authNotice());return;}
  root.innerHTML=renderShell();
 }
 async function refresh(){
  state.contacts=await store.contacts();
  if(userIsAdmin()){
-   const [batches,accounts]=await Promise.all([store.batches(),store.users()]);
-   state.batches=batches;state.accounts=accounts;
+   const [batches,accounts,audit]=await Promise.all([store.batches(),store.users(),store.userAudit()]);
+   state.batches=batches;state.accounts=accounts;state.audit=audit;
  }
  render();
 }
 async function init(){
- try{state.user=await store.session();if(store.demo||(state.user?.active&&!state.user.must_change_password))await refresh();}
+ try{state.user=await store.session();loadPreferences();if(store.demo||(state.user?.active&&!state.user.must_change_password))await refresh();}
  catch(e){state.notice={message:'Falha ao carregar dados: '+e.message,kind:'error'};}
  finally{state.loading=false;render();}
 }
+const preferenceKey=key=>key+':'+(state.user?.id||'demo');
+function loadPreferences(){state.favorites=storage(preferenceKey('cop-favorites'),[]);state.recent=storage(preferenceKey('cop-recent'),[]);}
 function saveRecent(){
  const q=state.filters.query,cluster=state.filters.cluster;
  const label=q||('Cluster '+(cluster||'todos'));
  const item={query:q,cluster,label,time:new Date().toLocaleString('pt-BR')};
  state.recent=[item,...state.recent.filter(i=>!(i.query===q&&i.cluster===cluster))].slice(0,8);
- setStorage('cop-recent',state.recent);
+ setStorage(preferenceKey('cop-recent'),state.recent);
 }
 function copyText(text) {
  if(navigator.clipboard?.writeText)return navigator.clipboard.writeText(text);
@@ -185,8 +205,8 @@ root.addEventListener('submit',async e=>{
  }
  if(e.target.id==='loginForm'){
   e.preventDefault();const f=new FormData(e.target);
-  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
-  catch(err){toast('Login falhou: '+err.message,'error');}return;
+  try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));loadPreferences();if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
+  catch{toast('Não foi possível entrar. Confira matrícula e senha ou procure o administrador.','error');}return;
  }
  if(e.target.id==='changePasswordForm'){
   e.preventDefault();
@@ -198,10 +218,14 @@ root.addEventListener('submit',async e=>{
   if(next.length<12||next===current){toast('Escolha uma senha diferente com pelo menos 12 caracteres.','error');return;}
   state.busy=true;
   try{
-    await store.changePassword(current,next);
+    const result=await store.changePassword(current,next);
+    if(result.reauthenticate){
+      await store.signOut();clearPrivateState();state.view='consultar';render();
+      toast('Senha alterada. Entre novamente com sua nova senha.','success');return;
+    }
     state.user=await store.session();
     if(!state.user?.active||state.user.must_change_password)throw Error('A liberação da conta ainda está pendente.');
-    await refresh();toast('Senha pessoal definida com sucesso.','success');
+    state.view='consultar';await refresh();toast('Senha pessoal definida com sucesso.','success');
   }catch(err){toast('Falha na troca: '+err.message,'error');}
   finally{state.busy=false;}
   return;
@@ -260,11 +284,12 @@ root.addEventListener('click',async e=>{
  const btn=e.target.closest('button,[data-contact]');if(!btn)return;
  if(btn.dataset.contact){ // registro local de acesso a contato; não atesta ligação
   const c=state.contacts.find(c=>c.id===btn.dataset.contact);
-  if(c){state.recent=[{query:c.full_name,cluster:c.cluster,label:c.full_name,time:new Date().toLocaleString('pt-BR')},...state.recent].slice(0,8);setStorage('cop-recent',state.recent);}
+  if(c){state.recent=[{query:c.full_name,cluster:c.cluster,label:c.full_name,time:new Date().toLocaleString('pt-BR')},...state.recent].slice(0,8);setStorage(preferenceKey('cop-recent'),state.recent);}
   return;
  }
  const action=btn.dataset.action;
  if(!action)return;
+ if(action==='change-password'){state.credentials=[];state.view='senha';render();return;}
  if(action==='nav'){
   if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
     state.credentials=[];state.roster=null;state.rosterRaw='';
@@ -284,7 +309,8 @@ root.addEventListener('click',async e=>{
   if(!confirm('Criar contas individuais com senhas provisórias aleatórias? As credenciais só serão exibidas nesta sessão.'))return;
   state.busy=true;state.credentials=[];render();
   try {
-    const result=await store.createUsers(state.roster.data,rows=>{state.credentials=[...rows];render();});
+    const result=await store.createUsers(state.roster.data,rows=>{if((state.sessionEpoch||0)===epoch){state.credentials=[...rows];render();}});
+    if((state.sessionEpoch||0)!==epoch)return;
     state.credentials=result;state.roster=null;state.rosterRaw='';await refresh();
     toast('Cadastro finalizado. Confira os resultados e distribua as senhas individualmente.','success');
   }catch(err){toast('Falha durante a criação. Contas já cadastradas foram preservadas. '+err.message,'error');}
@@ -299,16 +325,6 @@ root.addEventListener('click',async e=>{
  if(action==='clear-credentials'){
   state.credentials=[];render();toast('Senhas provisórias retiradas da tela.','success');return;
  }
- if(action==='export-credentials'){
-  if(!state.credentials.length)return;
-  const quote=x=>'"'+String(x??'').replace(/"/g,'""')+'"';
-  const csv='LOGIN;NOME;SENHA_PROVISORIA;STATUS\r\n'+state.credentials.map(x=>[x.login,x.nome,x.temporaryPassword||'',x.status].map(quote).join(';')).join('\r\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='central-cop-credenciais-confidencial.csv';document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),3000);
-  toast('Arquivo gerado localmente. Guarde em local protegido e exclua após distribuir as senhas.','info');return;
- }
  if(action==='reset-account'){
   if(!userIsAdmin()||state.busy)return;
   const profile=state.accounts.find(x=>x.id===btn.dataset.id);
@@ -316,7 +332,9 @@ root.addEventListener('click',async e=>{
   if(!confirm('Gerar uma NOVA senha provisória para '+profile.login_id+'? A senha anterior deixará de funcionar.'))return;
   state.busy=true;
   try{
+    const epoch=state.sessionEpoch||0;
     const reply=await store.resetUserPassword(profile.id);
+    if((state.sessionEpoch||0)!==epoch)return;
     state.credentials=[{login:profile.login_id,nome:profile.display_name,status:'created',temporaryPassword:reply.temporaryPassword}];
     await refresh();toast('Senha provisória redefinida. Entregue apenas ao titular.','success');
   }catch(err){toast('Não foi possível redefinir: '+err.message,'error');}
@@ -338,14 +356,19 @@ root.addEventListener('click',async e=>{
  if(action==='cluster'){state.filters.cluster=btn.dataset.cluster;state.filters.area='';state.filters.cidade='';state.filters.topologia='';state.filters.cargo='';state.filters.nivel='';render();return;}
  if(action==='clear'){state.filters={cluster:state.filters.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''};render();return;}
  if(action==='quick'){state.view='consultar';state.filters={...state.filters,query:'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};render();document.querySelector(btn.dataset.mode==='city'?'[data-filter="cidade"]':'[data-filter="topologia"]')?.focus();return;}
- if(action==='favorite'){const id=btn.dataset.id;state.favorites=state.favorites.includes(id)?state.favorites.filter(x=>x!==id):[id,...state.favorites];setStorage('cop-favorites',state.favorites);render();return;}
+ if(action==='favorite'){const id=btn.dataset.id;state.favorites=state.favorites.includes(id)?state.favorites.filter(x=>x!==id):[id,...state.favorites];setStorage(preferenceKey('cop-favorites'),state.favorites);render();return;}
  if(action==='recent'){state.filters.query=btn.dataset.query||'';state.filters.cluster=btn.dataset.cluster||'';state.view='consultar';render();return;}
  if(action==='jump'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c){state.filters={cluster:c.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:c.full_name};state.view='consultar';render();}return;}
  if(action==='copy'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c)return;try{await copyText(c.phone_display||c.phone_e164||'');toast('Telefone copiado.','success');}catch{toast('Cópia não permitida neste navegador.','error');}return;}
  if(action==='whatsapp'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c&&!store.demo&&whatsappUrl(c))window.open(whatsappUrl(c),'_blank','noopener,noreferrer');return;}
  if(action==='new'||action==='edit'){if(!userIsAdmin())return;state.modal=action==='new'?'new':btn.dataset.id;render();return;}
  if(action==='close-modal'){if(e.target!==btn&&e.target.classList.contains('modal-card'))return;state.modal=null;render();return;}
- if(action==='logout'){await store.signOut();state.user=null;render();return;}
+ if(action==='logout'){
+  try{await store.signOut();}finally{
+   clearPrivateState();
+   render();
+  }return;
+ }
  if(action==='publish'){
   if(!userIsAdmin()||!state.upload||state.busy)return;
   const data=state.upload,diff=importPreview(state.contacts,data.valid,state.importMode);
@@ -357,10 +380,24 @@ root.addEventListener('click',async e=>{
   catch(err){toast('Falha na importação: '+err.message,'error');}finally{state.busy=false;}return;
  }
  if(action==='restore'){if(!userIsAdmin()||state.busy)return;
-  if(!confirm('RESTABELECER a versão anterior a esta importação? Todas as alterações posteriores serão substituídas.'))return;
+  if(!confirm('Restaurar os clusters desta importação ao estado anterior? Alterações posteriores nesses clusters serão substituídas. Os demais clusters serão preservados.'))return;
   state.busy=true;
   try{await store.restore(btn.dataset.id);await refresh();toast('Diretório restaurado.','success');}
   catch(err){toast('Falha na restauração: '+err.message,'error');}finally{state.busy=false;}return;
  }
 });
 init();
+if(store.configured&&!store.configurationError){
+ let checking=false;
+ setInterval(async()=>{
+  if(checking||state.busy||!state.user)return;
+  checking=true;
+  try{
+   const user=await store.session();
+   if(!user?.active||user.must_change_password){clearPrivateState();state.user=user;render();}
+   else if(user.role!==state.user.role){clearPrivateState();state.user=user;await refresh();}
+   else state.user=user;
+  }catch{clearPrivateState();render();}
+  finally{checking=false;}
+ },30000);
+}

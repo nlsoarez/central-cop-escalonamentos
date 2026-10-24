@@ -30,6 +30,9 @@ test('CSV respeita aspas, delimitadores e valores com quebra de linha',()=>{
  assert.equal(rows[1][1],'Nome, Exemplo');
  assert.equal(rows[1][3],'linha 1;\nlinha 2');
 });
+test('CSV truncado não vira uma prévia parcial publicável',()=>{
+ assert.throws(()=>parseCsv('Cluster;Nome;Telefone\nRJ;"Campo sem fim;21999990001'),/aspas não encerradas/);
+});
 test('importação exige cluster explícito ou nome de aba',()=>{
  const tables=[{sheet:'Planilha1',rows:[['Nome','Telefone'],['João Exemplo','(21) 99999-0001']]}];
  const result=parseTables(tables);

@@ -77,6 +77,7 @@ export function parseCsv(text) {
       row=[];cell='';
     } else cell+=ch;
   }
+  if(inside)throw new Error('CSV inválido: campo com aspas não encerradas');
   row.push(cell.trim());if(row.some(Boolean)) rows.push(row);
   return rows;
 }

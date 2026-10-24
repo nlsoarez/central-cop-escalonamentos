@@ -1,0 +1,17 @@
+{
+  "name": "central-cop-escalonamentos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/core.mjs && node --check src/store.mjs && node --check src/app.mjs && node --check src/users.mjs",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.11"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
