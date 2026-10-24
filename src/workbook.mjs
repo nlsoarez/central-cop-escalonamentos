@@ -1,5 +1,5 @@
 // Leitura local do modelo de escalonamento em blocos. Não contém dados reais.
-import {normalizeText,normalizePhone,resolveCluster,parseTables,contactKey,sameContactData} from './core.mjs';
+import {normalizeText,normalizePhone,resolveCluster,parseTables,contactKey} from './core.mjs';
 
 const text=v=>String(v??'').trim();
 const key=normalizeText;
@@ -72,7 +72,7 @@ function stateCities(value){
 export function parseWorkbook(tables){
  const valid=[],errors=[],warnings=[],sheets=[];
  const groups=mappingFrom(tables,errors,warnings);
- const sources=new Map();
+ const occurrences=new Map();
  for(const table of tables){
   const sheetKey=key(table.sheet);
   if(sheetKey==='mg cidades x cluster'){sheets.push({sheet:table.sheet,kind:'reference',contacts:0});continue;}
@@ -161,14 +161,10 @@ export function parseWorkbook(tables){
    const cities=r.cities.length?r.cities:citiesByArea.get(areaKey(r.contact.area))||[];
    for(const city of cities.length?cities:['']){
     const c={...r.contact,cidade:city,scope:city?'local':'regional'};
-    const id=contactKey(c),previous=sources.get(id);
-    // A origem muda por linha. Só colapsar cópias com os mesmos dados operacionais e observações.
-    const comparable=v=>({...v,notes:v.notes.replace(/^Origem:.*(?:\n|$)/m,'')});
-    if(previous){
-     if(sameContactData(comparable(previous),comparable(c))){warn(r.row,'Repetição idêntica no mesmo contexto consolidada em um único contato.');continue;}
-     errors.push({sheet:table.sheet,row:r.row,message:'Mesmo contato e abrangência com dados diferentes. Revise os registros antes de publicar.'});continue;
-    }
-    sources.set(id,c);valid.push(c);count++;
+    const id=contactKey(c),occurrence=(occurrences.get(id)||0)+1;
+    occurrences.set(id,occurrence);
+    // Cada ocorrência da fonte é um registro. Não consolidar nomes nem linhas iguais.
+    valid.push({...c,source_occurrence:occurrence});count++;
    }
   }
   sheets.push({sheet:table.sheet,kind:'blocks',contacts:count});

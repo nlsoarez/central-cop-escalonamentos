@@ -76,11 +76,33 @@ test('Bahia e Sergipe reconhecida e dois telefones ficam preservados',()=>{
  assert.match(p.valid[0].notes,/Telefone adicional: \(79\) 99999-0002/);
 });
 
-test('cópias idênticas consolidam, divergências de telefone continuam bloqueadas',()=>{
+test('cada linha da fonte é preservada, inclusive repetições iguais e telefones distintos',()=>{
  const p=parseWorkbook([block('RJ',[['1º NÍVEL DE ESCALONAMENTO'],header,person(),person()])]);
- assert.equal(p.valid.length,1);assert.equal(p.errors.length,0);assert.equal(importPreview([],p.valid).duplicates,0);
+ assert.equal(p.valid.length,2);assert.equal(p.errors.length,0);assert.equal(importPreview([],p.valid).duplicates,0);
+ assert.deepEqual(p.valid.map(c=>c.source_occurrence),[1,2]);
+ assert.match(p.valid[0].notes,/linha 3/);assert.match(p.valid[1].notes,/linha 4/);
+ assert.equal(p.warnings.length,0);
  const conflict=parseWorkbook([block('RJ',[['1º NÍVEL DE ESCALONAMENTO'],header,person(),person('RJ','GPON','Pessoa Exemplo','(21) 99999-0002')])]);
- assert.equal(conflict.errors.length,1);assert.match(conflict.errors[0].message,/dados diferentes/);
+ assert.equal(conflict.errors.length,0);assert.equal(conflict.valid.length,2);
+ assert.deepEqual(conflict.valid.map(c=>c.phone_e164),['5521999990001','5521999990002']);
+ assert.equal(importPreview([],conflict.valid).duplicates,0);
+});
+
+test('um gestor em áreas, cidades, topologias ou níveis distintos mantém cada abrangência',()=>{
+ const p=parseWorkbook([block('RJ',[
+  ['Área A'],['1º NÍVEL DE ESCALONAMENTO'],header,person(),person('RJ','FIBRA'),
+  ['2º NÍVEL DE ESCALONAMENTO'],header,person(),
+  ['Área B'],['1º NÍVEL DE ESCALONAMENTO'],header,person()
+ ]),block('Norte',[
+  ['1º NÍVEL DE ESCALONAMENTO'],['OPERAÇÃO','UF','MERCADO','NOME','CARGO','E-MAIL','TELEFONE'],
+  ['Cidade A','PA','GPON','Pessoa Exemplo','Supervisor','','(91) 99999-0001'],
+  ['Cidade B','PA','GPON','Pessoa Exemplo','Supervisor','','(91) 99999-0001']
+ ])]);
+ assert.equal(p.errors.length,0);assert.equal(p.valid.length,6);
+ assert.ok(p.valid.every(c=>c.source_occurrence===1));
+ assert.equal(importPreview([],p.valid).duplicates,0);
+ assert.equal(importPreview(p.valid,p.valid).added,0);
+ assert.equal(importPreview(p.valid,p.valid).unchanged,6);
 });
 
 test('duas pessoas alinhadas na mesma célula recebem seus próprios telefones e e-mails',()=>{

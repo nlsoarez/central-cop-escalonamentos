@@ -140,7 +140,7 @@ export function parseTables(tables) {
   return {valid,errors};
 }
 export function contactKey(contact){
-  return [contact.cluster,contact.area,contact.cidade,contact.topologia,contact.full_name,contact.cargo,contact.nivel]
+  return [contact.cluster,contact.area,contact.cidade,contact.topologia,contact.full_name,contact.cargo,contact.nivel,contact.source_occurrence??1]
     .map(normalizeText).join('|');
 }
 export function sameContactData(a,b) {

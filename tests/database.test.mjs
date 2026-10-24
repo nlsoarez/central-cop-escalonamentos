@@ -138,4 +138,33 @@ test('migrações, RLS, sessões e importações em PostgreSQL isolado',async t=
   await as('service_role',null,null);
   assert.equal((await db.query('select public.cop_consume_initial_setup($1) id',['a'.repeat(64)])).rows[0].id,null);
  });
+ await t.test('ocorrências repetidas da planilha são gravadas e reimportadas sem consolidação',async()=>{
+  await root();await db.query('update public.cop_profiles set must_change_password=false where id=$1',[admin]);
+  await as('authenticated',admin,adminSession);
+  const repeated=[1,2,3].map(source_occurrence=>({...contact('NO','Gestor sintético repetido'),source_occurrence,notes:'Origem: Norte, linha '+(source_occurrence+2)}));
+  const first=await publish(repeated);
+  assert.equal(first.added,3);
+  assert.deepEqual((await db.query("select source_occurrence from public.cop_contacts where cluster='NO' order by source_occurrence")).rows.map(r=>r.source_occurrence),[1,2,3]);
+  const second=await publish(repeated);
+  assert.equal(second.added,0);assert.equal(second.changed,0);
+  const changed=await publish(repeated.map(r=>r.source_occurrence===2?{...r,phone_e164:'5591999990002'}:r));
+  assert.equal(changed.added,0);assert.equal(changed.changed,1);
+  await db.query('select public.cop_restore_import($1)',[changed.batch_id]);
+  const restored=(await db.query("select source_occurrence,phone_e164 from public.cop_contacts where cluster='NO' order by source_occurrence")).rows;
+  assert.equal(restored.length,3);assert.ok(restored.every(r=>r.phone_e164===repeated[0].phone_e164));
+  await assert.rejects(publish([{...contact('BA'),source_occurrence:0}]),/inválido/);
+  await assert.rejects(publish([repeated[0],repeated[0]]),/duplicado/);
+  assert.equal((await db.query("select count(*) from public.cop_contacts where cluster='NO'")).rows[0].count,3);
+ });
+ await t.test('restauração de snapshot antigo sem ocorrência continua compatível',async()=>{
+  await as('authenticated',admin,adminSession);
+  await publish([contact('ES','Gestor legado')]);
+  const update=await publish([{...contact('ES','Gestor legado'),phone_e164:'5527999990002'}]);
+  await root();
+  await db.query("update public.cop_import_batches set before_snapshot=(select jsonb_agg(item-'source_occurrence') from jsonb_array_elements(before_snapshot) item) where id=$1",[update.batch_id]);
+  await as('authenticated',admin,adminSession);
+  await db.query('select public.cop_restore_import($1)',[update.batch_id]);
+  const restored=(await db.query("select source_occurrence,phone_e164 from public.cop_contacts where cluster='ES'")).rows[0];
+  assert.equal(restored.source_occurrence,1);assert.equal(restored.phone_e164,contact('ES').phone_e164);
+ });
 });
