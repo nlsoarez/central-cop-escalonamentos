@@ -106,7 +106,7 @@ A infraestrutura de banco e as Edge Functions são entregues como **código e mi
 **Publicação sem GitHub Actions:** execute os testes localmente e publique pela integração Git nativa da Vercel ou por deploy direto no projeto existente. Não crie workflows.
 
 
-## Ambiente de demonstração na Vercel (24/10/2026)
+## Implantação inicial na Vercel — histórico (24/10/2026)
 
 Foi criado um projeto separado no time Vercel `nlsoarez's projects`, com uma implantação **estática** da interface em:
 
@@ -121,8 +121,8 @@ Não foram enviados CSVs com dados de colaboradores para a implantação nem seg
 
 ## Preparação atual
 
-O [relatório técnico de 24/10/2026](docs/STATUS-2026-10-24.md) registra as correções e os bloqueios. **Ainda não liberado para operação:** backend independente não implantado e zero contas reais cadastradas nesta execução.
+O [relatório da implantação do backend](docs/BACKEND-INDEPENDENTE.md) registra o estado mais recente: stack exclusiva instalada na VPS, API HTTPS, 51 testes locais aprovados, homologação real de autenticação e backup/restauração verificados. A lista dos 58 analistas está preparada em tabela privada, e o administrador inicial aguarda ativação. As 58 contas individuais ainda precisam ser criadas na sessão administrativa para que suas senhas sejam mostradas somente ao administrador. Os contatos operacionais reais ainda precisam ser importados. O [relatório inicial](docs/STATUS-2026-10-24.md) é histórico.
 
 O build usa uma lista de arquivos públicos em `scripts/build.mjs`. `npm run build` gera `dist/`; URL/chave pública opcionais vêm de `COP_SUPABASE_URL` e `COP_SUPABASE_ANON_KEY`. Nunca informe chave service_role ou secret. A Vercel usa `vercel.json`, sem GitHub Actions.
 
-Sessões são conferidas no banco e têm duração absoluta de 12 horas. Bloqueio/reset/troca revogam sessões. A troca de senha exige novo login. O limite de tentativas do endpoint público de login ainda precisa ser configurado e homologado no provedor/gateway; o limite das funções de gestão e troca de senha não o substitui.
+Sessões são conferidas no banco e têm duração absoluta de 12 horas. Bloqueio/reset/troca revogam sessões. A troca de senha exige novo login. O gateway próprio limita o login a dez tentativas por conta/15 minutos e 300 por origem/15 minutos, com mensagens genéricas. A troca e a gestão também têm limites compartilhados no banco.
