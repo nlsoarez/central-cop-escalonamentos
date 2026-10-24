@@ -20,7 +20,7 @@ Portal independente para consulta operacional de contatos e níveis de escalonam
 
 ## Iniciar a interface
 
-Basta abrir `index.html` via servidor HTTP local ou GitHub Pages. Por exemplo:
+Basta abrir `index.html` via servidor HTTP local. Por exemplo:
 
 ```bash
 python -m http.server 8080
@@ -41,7 +41,7 @@ set active = true, role = 'admin'
 where id = (select id from auth.users where email = 'ADMIN@EXEMPLO.COM');
 ```
 
-5. Para GitHub Pages, configure **Settings → Secrets and variables → Actions → Variables** no repositório novo: `COP_SUPABASE_URL` e `COP_SUPABASE_ANON_KEY` (ambas são informações publicáveis, desde que o RLS esteja correto). O workflow gera `config.js` durante a publicação; não é necessário versioná-lo. Habilite GitHub Pages com fonte **GitHub Actions** em **Settings → Pages**. Não publique contatos operacionais, credenciais privadas ou arquivos reais no repositório público.
+5. Publique os arquivos estáticos diretamente no projeto Vercel existente `central-cop-escalonamentos`. Inclua `config.js` somente com URL e chave pública do backend independente. Use integração Git nativa ou deploy direto. Nunca publique dados operacionais ou segredos no repositório público.
 6. Publique as Edge Functions `cop-manage-users` e `cop-change-password` **no Supabase novo** e habilite JWT verificado. Elas precisam de `SUPABASE_SERVICE_ROLE_KEY` **apenas no ambiente seguro das funções**, jamais no navegador ou no GitHub.
 7. No portal, o administrador abre **Usuários e senhas**, envia o arquivo CSV (`LOGIN;NOME`) ou cola a lista como tabela Markdown, valida e cria as contas. Os lotes são enviados de 20 em 20 para evitar excesso de chamadas.
 8. As senhas provisórias individuais são geradas no servidor e **exibidas somente no resultado da operação, sem opção de consulta posterior**, na sessão do administrador. Distribua cada senha apenas ao titular por um meio seguro. A alteração no primeiro acesso é obrigatória. O cadastro público fica desabilitado. A base de 58 colaboradores fornecida para importação é um arquivo privado de trabalho, não é incluída no código-fonte do repositório público.
@@ -94,13 +94,13 @@ supabase functions deploy cop-manage-users
 supabase functions deploy cop-change-password
 ```
 
-No dashboard Supabase, mantenha `Verify JWT` habilitado para as duas funções. A origem padrão autorizada para o GitHub Pages é `https://nlsoarez.github.io`. Para outros domínios de publicação, configure `COP_ALLOWED_ORIGINS` como uma lista separada por vírgulas nos segredos das Edge Functions.
+No dashboard Supabase, mantenha `Verify JWT` habilitado para as duas funções. Configure `COP_ALLOWED_ORIGINS` com `https://central-cop-escalonamentos.vercel.app`; acrescente outros domínios autorizados separados por vírgulas.
 
 ### Limitações para publicação
 
 A infraestrutura de banco e as Edge Functions são entregues como **código e migrações**, mas ainda precisam ser implantadas e validadas no Supabase independente. Nenhuma matrícula real ou senha foi cadastrada em um banco pela simples inclusão dessa estrutura no GitHub.
 
-**GitHub Actions:** os workflows da validação/publicação devem ser inspecionados; o último estado consultado antes dessa implementação apresentava falhas de inicialização. Não considere o portal publicado até um deploy bem-sucedido.
+**Publicação sem GitHub Actions:** execute os testes localmente e publique pela integração Git nativa da Vercel ou por deploy direto no projeto existente. Não crie workflows.
 
 
 ## Ambiente de demonstração na Vercel (24/10/2026)
@@ -114,3 +114,4 @@ Este endereço tem dados **fictícios** e não possui Supabase configurado. O de
 A vinculação GitHub → Vercel falhou porque a integração de login do GitHub não está habilitada para a conta Vercel. A implantação inicial foi criada diretamente com os sete arquivos de frontend, por isso **novos commits do GitHub não entram automaticamente na Vercel** até essa conexão ser concluída.
 
 Não foram enviados CSVs com dados de colaboradores para a implantação nem segredos de autenticação. Não usar para produção até que se crie um Supabase separado e sejam testadas as políticas RLS e as duas Edge Functions.
+
