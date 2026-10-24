@@ -19,6 +19,7 @@ function fixture(options={}){
  const admin={
   rpc:async(name,args)=>{
    calls.push({name,args});
+   if(name==='cop_consume_initial_setup')return {data:options.setupUser||null,error:null};
    if(name==='cop_session_valid_for')return {data:options.sessionValid!==false};
    if(name==='cop_consume_limit')return {data:options.limit!==false};
    if(name==='cop_acquire_account_lock')return {data:options.locked?null:'lease'};
@@ -67,7 +68,7 @@ async function load(name,options){
  const f=fixture(options);let handler;
  let source=await readFile(new URL('../supabase/functions/'+name+'/index.ts',import.meta.url),'utf8');
  source=source.replace(/^import .+;\r?\n/gm,'');
- const context={...security,createClient:f.createClient,Request,Response,crypto,btoa,atob,console,
+ const context={...security,createClient:f.createClient,Request,Response,crypto,btoa,atob,console,TextEncoder,
   Deno:{env:{get:key=>({SUPABASE_URL:'https://example.invalid',SUPABASE_SERVICE_ROLE_KEY:'service',SUPABASE_ANON_KEY:'public'})[key]},serve:fn=>{handler=fn;}}};
  vm.runInNewContext(stripTypeScriptTypes(source),context);
  return {...f,handler};
@@ -157,4 +158,16 @@ test('troca bem-sucedida revoga sessões e exige nova autenticação',async()=>{
  assert.ok(f.calls.some(c=>c.name==='cop_revoke_sessions'));
  assert.ok(f.calls.some(c=>c.name==='verificationSignOut'));
  assert.equal(f.audit[0].event,'change_password');
+});
+test('ativação inicial exige token válido e não aceita senha curta',async()=>{
+ const f=await load('cop-initial-setup');
+ assert.equal((await f.handler(request({token:'a'.repeat(64),password:'short'}))).status,400);
+ assert.equal((await f.handler(request({token:'a'.repeat(64),password:'LongSynthetic123!'}))).status,400);
+ assert.ok(!f.calls.some(c=>c.name==='passwordUpdate'));
+});
+test('ativação inicial altera senha apenas do administrador vinculado ao token',async()=>{
+ const f=await load('cop-initial-setup',{setupUser:actor,operator:{must_change_password:true}});
+ const response=await f.handler(request({token:'a'.repeat(64),password:'LongSynthetic123!'}));
+ assert.equal(response.status,200);assert.equal(f.profiles.get(actor).must_change_password,false);
+ assert.ok(f.calls.some(c=>c.name==='cop_revoke_sessions'));
 });

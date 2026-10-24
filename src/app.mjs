@@ -3,6 +3,8 @@ import {store} from './store.mjs';
 import {parseRoster} from './users.mjs';
 
 const root=document.getElementById('app');
+const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
+if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 const iconPaths={
  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
@@ -30,7 +32,7 @@ const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
-const state={user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
+const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 const toast=(message,kind='info')=>{
  state.notice={message,kind};
  root.querySelectorAll('.toast').forEach(el=>el.remove());
@@ -132,7 +134,7 @@ function usersPage(){
   '<section class="panel credentials" aria-label="Senhas provisórias"><h3>'+ic('alert')+' Credenciais geradas — visualização temporária</h3><p>As senhas são <strong>individuais</strong>, geradas aleatoriamente e deverão ser trocadas no primeiro acesso. Não são salvas no portal. Entregue cada senha exclusivamente ao seu titular por canal seguro. Caso perca uma senha, utilize Redefinir.</p><div class="toolbar"><button class="btn subtle" data-action="clear-credentials">Apagar senhas da tela</button></div><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Senha provisória</th></tr></thead><tbody>'+
   credentials.map(u=>'<tr><td><strong>'+h(u.login)+'</strong></td><td>'+h(u.nome)+'</td><td>'+h(({created:'Criado',exists:'Já cadastrado',error:'Erro'})[u.status]||'Desconhecido')+'</td><td>'+(u.temporaryPassword?'<code>'+h(u.temporaryPassword)+'</code> <button class="icon-btn" data-action="copy-password" data-login="'+h(u.login)+'" title="Copiar senha">'+ic('copy')+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div></section>':'';
  return '<div class="standalone"><section class="panel users-intro"><h3>'+ic('users')+' Contas individuais</h3><p>O acesso será realizado por <strong>matrícula + senha pessoal</strong>. Cada usuário recebe uma senha provisória exclusiva e precisará substituí-la no primeiro login. A senha definitiva fica protegida pelo Supabase Auth. Matrículas e nomes não são publicados no GitHub.</p><p class="panel-hint">Cadastro restrito ao administrador. O portal e a autenticação são independentes do SIM.</p></section>'+
- '<section class="panel roster-panel"><h3>Importar usuários</h3><p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="file-pick">Selecionar CSV de usuários<input type="file" id="usersImportFile" accept=".csv,.txt" '+(state.busy?'disabled':'')+'/></label><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
+ '<section class="panel roster-panel"><h3>Importar usuários</h3>'+(state.pendingRoster.length?'<p><strong>'+state.pendingRoster.length+' analistas</strong> na lista privada preparada para cadastro.</p><button class="btn subtle" data-action="load-pending-roster">Carregar lista dos analistas</button>':'')+'<p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="file-pick">Selecionar CSV de usuários<input type="file" id="usersImportFile" accept=".csv,.txt" '+(state.busy?'disabled':'')+'/></label><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
  (validated?'<p><strong>'+validated.data.length+'</strong> matrícula(s) válidas e <strong>'+validated.errors.length+'</strong> inconsistência(s).</p>'+
  (validated.errors.length?'<div class="error-list"><ul>'+validated.errors.slice(0,12).map(x=>'<li>Linha '+x.line+': '+h(x.message)+'</li>').join('')+'</ul></div>':'')+
  '<div class="table-overflow"><table class="preview-table"><thead><tr><th>Matrícula</th><th>Nome</th></tr></thead><tbody>'+validated.data.slice(0,12).map(x=>'<tr><td>'+h(x.login)+'</td><td>'+h(x.nome)+'</td></tr>').join('')+'</tbody></table></div><p class="panel-hint">Visualização parcial de até 12 registros.</p>':'')+'</section>'+
@@ -144,6 +146,9 @@ function renderUserAudit(){
  const events={create:'Conta criada',reset:'Senha redefinida',activate:'Acesso reativado',deactivate:'Acesso bloqueado',change_password:'Senha pessoal alterada'};
  const identity=id=>state.accounts.find(u=>u.id===id)?.login_id||id;
  return '<h3 class="subheading">Histórico administrativo</h3><div class="panel"><div class="table-overflow"><table class="preview-table"><thead><tr><th>Data</th><th>Operador</th><th>Conta</th><th>Ação</th></tr></thead><tbody>'+(state.audit||[]).map(a=>'<tr><td>'+h(new Date(a.created_at).toLocaleString('pt-BR'))+'</td><td>'+h(identity(a.actor))+'</td><td>'+h(identity(a.target))+'</td><td>'+h(events[a.event]||a.event)+'</td></tr>').join('')+'</tbody></table></div></div>';
+}
+function initialSetupView(){
+ return '<div class="auth-screen"><div class="auth-card"><h1>Ativar administrador</h1><p>Defina a senha pessoal da conta administrativa. Este link só pode ser usado uma vez.</p><form id="initialSetupForm"><label>Nova senha pessoal<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a senha<input name="confirmation" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>Ativar acesso</button></form></div></div>';
 }
 function passwordChangeView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',34)+'</div><span class="overline">SENHA PESSOAL</span><h1>Altere sua senha</h1><p>Informe a senha atual e escolha uma nova senha pessoal. No primeiro acesso, esta troca é obrigatória.</p><form id="changePasswordForm"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
@@ -160,13 +165,14 @@ function loginView(){
 }
 function clearPrivateState(){
  state.sessionEpoch=(state.sessionEpoch||0)+1;
- state.user=null;state.contacts=[];state.accounts=[];state.batches=[];state.audit=[];state.upload=null;
+ state.pendingRoster=[];state.user=null;state.contacts=[];state.accounts=[];state.batches=[];state.audit=[];state.upload=null;
  state.credentials=[];state.roster=null;state.rosterRaw='';state.modal=null;state.view='consultar';
  state.recent=[];state.favorites=[];
 }
 const authNotice=()=>state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'';
 function render(){
  if(store.configurationError){root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>Serviço indisponível</h1><p>'+h(store.configurationError)+'</p></div></div>';return;}
+ if(state.setupToken){root.innerHTML=initialSetupView()+authNotice();return;}
  if(state.loading){root.innerHTML='<div class="loading">'+ic('refresh',34)+' Carregando Central COP...</div>';return;}
  if(store.configured && state.user?.active && (state.user.must_change_password||state.view==='senha')){root.innerHTML=passwordChangeView()+authNotice();return;}
  if(store.configured && !state.user?.active){root.innerHTML=state.user?.role==='pending'?'<div class="auth-screen"><div class="auth-card"><h2>Acesso pendente</h2><p>Seu usuário ainda não foi liberado. Procure o administrador.</p><button class="btn primary" data-action="logout">Sair</button></div></div>':loginView();root.insertAdjacentHTML('beforeend',authNotice());return;}
@@ -175,8 +181,8 @@ function render(){
 async function refresh(){
  state.contacts=await store.contacts();
  if(userIsAdmin()){
-   const [batches,accounts,audit]=await Promise.all([store.batches(),store.users(),store.userAudit()]);
-   state.batches=batches;state.accounts=accounts;state.audit=audit;
+   const [batches,accounts,audit,pending]=await Promise.all([store.batches(),store.users(),store.userAudit(),store.pendingRoster()]);
+   state.batches=batches;state.accounts=accounts;state.audit=audit;state.pendingRoster=pending;
  }
  render();
 }
@@ -200,6 +206,17 @@ function copyText(text) {
  document.execCommand('copy');el.remove();return Promise.resolve();
 }
 root.addEventListener('submit',async e=>{
+ if(e.target.id==='initialSetupForm'){
+  e.preventDefault();if(state.busy)return;
+  const form=new FormData(e.target),password=String(form.get('password')||'');
+  if(password!==String(form.get('confirmation')||'')){toast('As senhas não coincidem.','error');return;}
+  state.busy=true;
+  try{await store.initialSetup(state.setupToken,password);state.setupToken='';clearPrivateState();render();toast('Administrador ativado. Entre com seu login e sua senha pessoal.','success');}
+  catch(error){toast(error.message,'error');}
+  finally{state.busy=false;}
+  return;
+ }
+
  if(e.target.id==='searchForm'||e.target.id==='directoryForm'){
   e.preventDefault();state.filters.query=new FormData(e.target).get('query')?.trim()||'';saveRecent();render();return;
  }
@@ -296,6 +313,11 @@ root.addEventListener('click',async e=>{
   }
   state.view=btn.dataset.page;render();return;
  }
+ if(action==='load-pending-roster'){
+  if(!userIsAdmin()||state.busy)return;
+  state.rosterRaw='LOGIN;NOME\n'+state.pendingRoster.map(u=>u.login_id+';'+u.display_name).join('\n');
+  state.roster=parseRoster(state.rosterRaw);render();return;
+ }
  if(action==='validate-roster'){
   if(!userIsAdmin())return;
   const text=document.getElementById('rosterText')?.value||'';
@@ -308,6 +330,7 @@ root.addEventListener('click',async e=>{
   if(!userIsAdmin()||state.busy||!state.roster?.data?.length||state.roster.errors.length)return;
   if(!confirm('Criar contas individuais com senhas provisórias aleatórias? As credenciais só serão exibidas nesta sessão.'))return;
   state.busy=true;state.credentials=[];render();
+  const epoch=state.sessionEpoch||0;
   try {
     const result=await store.createUsers(state.roster.data,rows=>{if((state.sessionEpoch||0)===epoch){state.credentials=[...rows];render();}});
     if((state.sessionEpoch||0)!==epoch)return;
@@ -387,6 +410,10 @@ root.addEventListener('click',async e=>{
  }
 });
 init();
+window.addEventListener('hashchange',()=>{
+ const token=new URLSearchParams(location.hash.slice(1)).get('setup');
+ if(token){state.setupToken=token;history.replaceState(null,'',location.pathname+location.search);render();}
+});
 if(store.configured&&!store.configurationError){
  let checking=false;
  setInterval(async()=>{

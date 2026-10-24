@@ -60,6 +60,11 @@ export const store={
   async changePassword(currentPassword,newPassword){
     return this.invoke('cop-change-password',{currentPassword,newPassword});
   },
+  async initialSetup(token,password){return this.invoke('cop-initial-setup',{token,password});},
+  async pendingRoster(){
+    if(!client)return [];
+    return expect(await client.from('cop_pending_roster').select('login_id,display_name').order('login_id'));
+  },
   async users(){
     if(!client)return [];
     return expect(await client.from('cop_profiles')

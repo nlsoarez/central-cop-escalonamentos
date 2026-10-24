@@ -1,0 +1,5 @@
+api-central-cop.179-198-124-8.sslip.io {
+  import secure_headers
+  reverse_proxy central-cop-gateway:8000
+  import safe_access_log
+}

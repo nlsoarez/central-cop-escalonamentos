@@ -1,0 +1,12 @@
+[Unit]
+Description=Encrypted backup of the independent Central COP backend
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/central-cop-escalonamentos/deploy/backup.sh
+User=root
+UMask=0077
+Nice=15
+IOSchedulingClass=idle
+TimeoutStartSec=300

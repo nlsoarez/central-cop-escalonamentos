@@ -4,3 +4,6 @@ verify_jwt = true
 
 [functions.cop-change-password]
 verify_jwt = true
+
+[functions.cop-initial-setup]
+verify_jwt = true

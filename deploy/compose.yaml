@@ -1,0 +1,121 @@
+name: central-cop-escalonamentos
+x-common: &common
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  logging: {driver: json-file, options: {max-size: 10m, max-file: '3'}}
+services:
+  db:
+    <<: *common
+    image: supabase/postgres:17.6.1.136@sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00
+    mem_limit: 1g
+    cpus: 1.0
+    shm_size: 128m
+    networks: [data]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: postgres
+      POSTGRES_PORT: 5432
+      PGPORT: 5432
+      JWT_EXP: 900
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+      - ./deploy/db-roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-cop-roles.sql:ro
+    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf, -c, max_connections=60, -c, shared_buffers=128MB, -c, log_min_messages=fatal]
+    healthcheck: {test: [CMD, pg_isready, -U, postgres, -h, localhost], interval: 5s, timeout: 5s, retries: 20}
+  auth:
+    <<: *common
+    image: supabase/gotrue:v2.197.0@sha256:1736a63078f5922b198c4cbe50f80ab9a2d3b54fe8b7b6cfb2e9dc5dbbc12c6b
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [data]
+    depends_on: {db: {condition: service_healthy}}
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${COP_PUBLIC_URL:?required}/auth/v1
+      GOTRUE_SITE_URL: https://central-cop-escalonamentos.vercel.app
+      GOTRUE_URI_ALLOW_LIST: https://central-cop-escalonamentos.vercel.app
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?required}
+      GOTRUE_JWT_ISSUER: ${COP_PUBLIC_URL}/auth/v1
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 900
+      GOTRUE_DISABLE_SIGNUP: 'true'
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_MAILER_AUTOCONFIRM: 'true'
+      GOTRUE_PASSWORD_MIN_LENGTH: 12
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: 'true'
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: 10
+    healthcheck: {test: [CMD, wget, --spider, -q, http://localhost:9999/health], interval: 10s, timeout: 5s, retries: 10}
+  rest:
+    <<: *common
+    image: postgrest/postgrest:v14.18@sha256:c7cd7e265a85b05248abf53f4473fcec7e327c282d0bd0cf60f1551996d09fcf
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [data]
+    depends_on: {db: {condition: service_healthy}}
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_POOL: 10
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_ADMIN_SERVER_PORT: 3001
+      PGRST_ADMIN_SERVER_HOST: localhost
+    healthcheck: {test: [CMD, postgrest, --ready], interval: 10s, timeout: 5s, retries: 10}
+  functions:
+    <<: *common
+    image: supabase/edge-runtime:v1.77.4@sha256:ad45164b7548bf5820ed7be714789c17ac2865edce79a09cfb4c3756c3d365a8
+    mem_limit: 512m
+    cpus: 0.75
+    networks: [data, outbound]
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY:?required}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?required}
+      COP_ALLOWED_ORIGINS: https://central-cop-escalonamentos.vercel.app
+    volumes:
+      - ./supabase/functions:/home/deno/functions:ro
+      - ./deploy/edge-main:/home/deno/main:ro
+      - deno-cache:/root/.cache/deno
+    command: [start, --user-worker-request-idle-timeout, '60000', --main-service, /home/deno/main]
+  gateway:
+    <<: *common
+    image: node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+    mem_limit: 256m
+    cpus: 0.5
+    user: '1000:1000'
+    read_only: true
+    cap_drop: [ALL]
+    networks:
+      data: {}
+      outbound: {}
+      ingress: {aliases: [central-cop-gateway]}
+    ports: [127.0.0.1:18183:8000]
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      COP_ALLOWED_ORIGINS: https://central-cop-escalonamentos.vercel.app
+      TRUST_PROXY: 'false'
+    volumes:
+      - ./deploy/gateway.mjs:/app/gateway.mjs:ro
+      - ./scripts/live-backend-check.mjs:/app/live-backend-check.mjs:ro
+      - ./scripts/bootstrap-admin.mjs:/app/bootstrap-admin.mjs:ro
+    command: [node, /app/gateway.mjs]
+    healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8000/health').then(r=>{if(!r.ok)process.exit(1)})"], interval: 10s, timeout: 5s, retries: 10}
+networks:
+  data: {internal: true}
+  outbound: {}
+  ingress: {external: true, name: central-cop-ingress}
+volumes:
+  db-data: {}
+  db-config: {}
+  deno-cache: {}

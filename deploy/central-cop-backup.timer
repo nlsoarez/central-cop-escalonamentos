@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Central COP encrypted backup
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=300
+Persistent=true
+Unit=central-cop-backup.service
+
+[Install]
+WantedBy=timers.target

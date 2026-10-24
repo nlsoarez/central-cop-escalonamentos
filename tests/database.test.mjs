@@ -119,4 +119,23 @@ test('migrações, RLS, sessões e importações em PostgreSQL isolado',async t=
   await db.query('select public.cop_release_account_lock($1,$2)',[viewer,token]);
   assert.ok((await db.query('select public.cop_acquire_account_lock($1) token',[viewer])).rows[0].token);
  });
+ await t.test('lista de analistas é privada e restrita ao administrador',async()=>{
+  await root();await db.query("insert into public.cop_pending_roster(login_id,display_name) values('F9900001','Pessoa Sintética')");
+  await as('authenticated',viewer,viewerSession);
+  assert.equal((await db.query('select * from public.cop_pending_roster')).rows.length,0);
+  await as('authenticated',admin,adminSession);
+  assert.equal((await db.query('select * from public.cop_pending_roster')).rows.length,1);
+ });
+ await t.test('token de ativação expira, é de único uso e não pode ser consumido pelo usuário',async()=>{
+  await root();await db.query('update public.cop_profiles set must_change_password=true where id=$1',[admin]);
+  await db.query("insert into public.cop_initial_setup(user_id,token_hash,expires_at) values($1,$2,now()+interval '1 hour')",[admin,'a'.repeat(64)]);
+  await as('authenticated',viewer,viewerSession);
+  await assert.rejects(db.query('select public.cop_consume_initial_setup($1) id',['a'.repeat(64)]),/permission denied/);
+  await as('service_role',null,null);
+  assert.equal((await db.query('select public.cop_consume_initial_setup($1) id',['a'.repeat(64)])).rows[0].id,admin);
+  assert.equal((await db.query('select public.cop_consume_initial_setup($1) id',['a'.repeat(64)])).rows[0].id,null);
+  await root();await db.query("update public.cop_initial_setup set consumed_at=null,expires_at=now()-interval '1 hour'");
+  await as('service_role',null,null);
+  assert.equal((await db.query('select public.cop_consume_initial_setup($1) id',['a'.repeat(64)])).rows[0].id,null);
+ });
 });
