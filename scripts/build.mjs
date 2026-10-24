@@ -4,6 +4,7 @@ import {resolve} from 'node:path';
 export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs'];
 export function publicConfig(env){
  const url=env.COP_SUPABASE_URL||'',key=env.COP_SUPABASE_ANON_KEY||'';
+ if(env.VERCEL_ENV==='production'&&(!url||!key))throw Error('Publicação de produção exige URL e chave pública do backend; demonstração não pode ser publicada em produção.');
  if(Boolean(url)!==Boolean(key))throw Error('Informe URL e chave pública juntas');
  if(url&&new URL(url).protocol!=='https:')throw Error('O backend publicado exige HTTPS');
  if(key&&!key.startsWith('sb_publishable_')){

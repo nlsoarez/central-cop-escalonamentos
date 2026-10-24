@@ -16,6 +16,8 @@ test('build publica somente a interface e configuração pública',async()=>{
  }finally{await rm(output,{recursive:true,force:true});}
 });
 test('build rejeita chaves privadas e configuração incompleta',()=>{
+ assert.throws(()=>publicConfig({VERCEL_ENV:'production'}),/produção exige/);
+ assert.equal(publicConfig({VERCEL_ENV:'production',COP_SUPABASE_URL:'https://test.invalid',COP_SUPABASE_ANON_KEY:'sb_publishable_synthetic'}).supabaseUrl,'https://test.invalid');
  for(const key of ['sb_secret_synthetic','header.'+Buffer.from('{"role":"service_role"}').toString('base64url')+'.signature']){
   assert.throws(()=>publicConfig({COP_SUPABASE_URL:'https://test.invalid',COP_SUPABASE_ANON_KEY:key}),/Somente chave/);
  }

@@ -22,3 +22,9 @@ A planilha fornecida pelo proprietário foi lida localmente com a mesma versão 
 A prévia alerta sobre cidades de MG sem contato local explícito, divergência de nível, pessoas agrupadas, repetições consolidadas e organograma visual. Esses avisos devem ser conferidos pelo administrador; aceitar o arquivo não atesta a exatidão operacional da fonte.
 
 O arquivo original e as extrações locais não fazem parte do build ou do Git. O build usa lista explícita de arquivos públicos. Não houve alteração no banco, autenticação, proxy ou infraestrutura. Para reversão da interface, pode-se restaurar o deployment de produção anterior pela Vercel; os dados do diretório não mudam com essa reversão.
+
+## Publicação
+
+Interface publicada na Vercel em `dpl_6T3u9dMeAS6e3y93WiqQ2PwpA1WD`, código `473c611`, como pacote estático com a configuração pública do backend preservada do deployment anterior. O primeiro empacotamento disparou um build sem as variáveis públicas e entrou em demonstração; a conferência no navegador detectou o problema. O rollback para além do último deployment foi recusado pelo limite do plano Vercel. A correção foi publicar o pacote estático configurado, sem mudar o plano ou as proteções. A configuração contém somente URL e chave anon, nunca chave de serviço.
+
+O build agora rejeita `VERCEL_ENV=production` sem URL e chave públicas, para que um build incompleto não publique demonstração em produção. Builds locais sem configuração continuam permitindo demonstração. A infraestrutura e os contatos de produção não foram alterados.
