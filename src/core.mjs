@@ -27,7 +27,7 @@ export function resolveCluster(input) {
   const known = {
     'RIO DE JANEIRO':'RJ', 'ESPIRITO SANTO':'ES', 'MINAS GERAIS':'MG',
     'CENTRO OESTE':'CO', 'CENTRO-OESTE':'CO', 'NORDESTE':'NE',
-    'NORTE':'NO', 'BAHIA':'BA', 'BAHIA SERGIPE':'BA', 'BA/SE':'BA'
+    'NORTE':'NO', 'BAHIA':'BA', 'BAHIA SERGIPE':'BA', 'BAHIA E SERGIPE':'BA', 'BA/SE':'BA'
   };
   if (known[value]) return known[value];
   // Nomes de abas: "RJ - Escalonamento", "Contatos (RJ)".
@@ -162,15 +162,22 @@ export function importPreview(existing,incoming,mode='merge') {
   }
   return {added,changed,unchanged,removed,clusters,duplicates:incoming.length-incomingMap.size};
 }
+export function topologyValues(value){
+  const v=normalizeText(value),tokens=[];
+  for(const [label,re] of [['GPON',/\bgpon\b/],['HFC',/\bhfc\b/],['FIBRA',/\b(fibra|fo)\b/],['COAXIAL',/\bcoaxial\b/],['EMPRESARIAL',/\b(empresarial|emp)\b/],['BKB',/\bbkb\b/]])if(re.test(v))tokens.push(label);
+  return tokens.length?tokens:String(value||'').trim()?[String(value).trim()]:[];
+}
 export function filterContacts(contacts, filters={}) {
   const search=normalizeText(filters.query);
   const activeOnly=filters.includeInactive !== true;
+  const cityAreas=new Set(contacts.filter(c=>(!filters.cluster||c.cluster===filters.cluster)&&normalizeText(c.cidade)===normalizeText(filters.cidade)).map(c=>c.cluster+'|'+normalizeText(c.area)));
   const filtered=contacts.filter(c=>{
     if(activeOnly && c.active===false) return false;
     if(filters.cluster && c.cluster!==filters.cluster) return false;
     if(filters.area && c.area && normalizeText(c.area)!==normalizeText(filters.area)) return false;
     if(filters.cidade && c.scope!=='regional' && c.cidade && normalizeText(c.cidade)!==normalizeText(filters.cidade)) return false;
-    if(filters.topologia && c.topologia && normalizeText(c.topologia)!==normalizeText(filters.topologia)) return false;
+    if(filters.cidade && c.scope==='regional' && c.area && !cityAreas.has(c.cluster+'|'+normalizeText(c.area)))return false;
+    if(filters.topologia && c.topologia && !topologyValues(c.topologia).some(v=>normalizeText(v)===normalizeText(filters.topologia)) && normalizeText(c.topologia)!==normalizeText(filters.topologia)) return false;
     if(filters.cargo && c.cargo && normalizeText(c.cargo)!==normalizeText(filters.cargo)) return false;
     if(filters.nivel && normalizeText(c.nivel)!==normalizeText(filters.nivel)) return false;
     if(search && !normalizeText([c.cluster,c.area,c.cidade,c.topologia,c.full_name,c.cargo,c.nivel,c.notes].join(' ')).includes(search)) return false;

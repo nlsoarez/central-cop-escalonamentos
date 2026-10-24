@@ -1,4 +1,5 @@
-import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,parseTables,filterContacts,importPreview,isCurrentValidity} from './core.mjs';
+import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,filterContacts,importPreview,isCurrentValidity,topologyValues} from './core.mjs';
+import {parseWorkbook} from './workbook.mjs';
 import {store} from './store.mjs';
 import {parseRoster} from './users.mjs';
 
@@ -59,12 +60,12 @@ function renderShell(){
  (state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'')+(state.modal?renderModal():'');
 }
 function clusterBar(){
- const labels={RJ:'Rio de Janeiro',ES:'Espírito Santo',MG:'Minas Gerais',CO:'Centro-Oeste',NE:'Nordeste',NO:'Norte',BA:'Bahia'};
+ const labels={RJ:'Rio de Janeiro',ES:'Espírito Santo',MG:'Minas Gerais',CO:'Centro-Oeste',NE:'Nordeste',NO:'Norte',BA:'Bahia / Sergipe'};
  return '<div class="clusters" aria-label="Clusters">'+CLUSTERS.map(c=>'<button type="button" data-action="cluster" data-cluster="'+c+'" class="cluster '+(state.filters.cluster===c?'selected':'')+'"><span class="cluster-symbol">'+ic('map',20)+'</span><span><strong>'+c+'</strong><small>'+labels[c]+'</small></span></button>').join('')+'</div>';
 }
 function optionList(key,label) {
  const candidates=state.contacts.filter(c=>!state.filters.cluster||c.cluster===state.filters.cluster);
- const vals=[...new Set(candidates.map(c=>c[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+ const vals=[...new Set(candidates.flatMap(c=>key==='topologia'?topologyValues(c[key]):[c[key]]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const current=state.filters[key]||'';
  const options='<option value="">Todos</option>'+vals.map(v=>'<option value="'+h(v)+'" '+(current===v?'selected':'')+'>'+h(v)+'</option>').join('');
  return '<label class="field"><span>'+label+'</span><select data-filter="'+key+'">'+options+'</select></label>';
@@ -114,14 +115,17 @@ function importPage(){
  let preview='';
  if(data){
   const diff=importPreview(state.contacts,data.valid,state.importMode);
-  preview='<section class="panel import-preview"><h3>Prévia da importação</h3><p><strong>'+data.valid.length+'</strong> linhas válidas · <strong>'+data.errors.length+'</strong> inconsistências · <strong>'+diff.duplicates+'</strong> duplicidades potenciais</p><div class="import-metrics"><div><strong>'+diff.added+'</strong><span>Novos</span></div><div><strong>'+diff.changed+'</strong><span>Alterados</span></div><div><strong>'+diff.removed+'</strong><span>Removidos</span></div><div><strong>'+diff.unchanged+'</strong><span>Sem alterações</span></div></div><p><strong>Clusters identificados:</strong> '+h(diff.clusters.join(', ')||'Nenhum')+'</p>'+
+  const previewRows=data.valid.filter(c=>normalizeText([c.cluster,c.area,c.cidade,c.topologia,c.full_name,c.cargo,c.nivel,c.notes].join(' ')).includes(normalizeText(data.previewQuery)));
+  preview='<section class="panel import-preview"><h3>Prévia da importação</h3><p>Arquivo: '+h(data.name)+'</p><p><strong>'+data.valid.length+'</strong> registros de contato e abrangência · <strong>'+data.errors.length+'</strong> inconsistências · <strong>'+diff.duplicates+'</strong> duplicidades potenciais</p><p>Um responsável pode gerar vários registros quando atende diversas cidades ou topologias.</p><div class="import-metrics"><div><strong>'+diff.added+'</strong><span>Novos</span></div><div><strong>'+diff.changed+'</strong><span>Alterados</span></div><div><strong>'+diff.removed+'</strong><span>Removidos</span></div><div><strong>'+diff.unchanged+'</strong><span>Sem alterações</span></div></div><p><strong>Clusters identificados:</strong> '+h(diff.clusters.join(', ')||'Nenhum')+'</p>'+
+  (data.sheets?.length?'<details><summary>Leitura por aba</summary><ul>'+data.sheets.map(s=>'<li>'+h(s.sheet)+': '+(s.kind==='reference'?'referência de cidades':s.kind==='organogram'?'organograma visual, sem importação de contatos':s.contacts+' registros')+'</li>').join('')+'</ul></details>':'')+
+  (data.warnings?.length?'<div class="warning"><strong>'+data.warnings.length+' avisos para conferir</strong><ul>'+data.warnings.map(w=>'<li>'+h(w.sheet)+(w.row?' · linha '+w.row:'')+': '+h(w.message)+'</li>').join('')+'</ul><label><input type="checkbox" id="importReviewed" '+(data.reviewed?'checked':'')+'/> Conferi os avisos e a abrangência dos contatos.</label></div>':'')+
   '<div class="import-mode"><label><input type="radio" name="mode" value="merge" '+(state.importMode==='merge'?'checked':'')+'/> Mesclar e atualizar sem remover</label><label><input type="radio" name="mode" value="replace_clusters" '+(state.importMode==='replace_clusters'?'checked':'')+'/> Substituir apenas os clusters importados</label></div>'+
   (state.importMode==='replace_clusters'?'<p class="warning">'+ic('alert')+' Este modo poderá remover contatos de '+h(diff.clusters.join(', '))+'. Nenhum outro cluster será afetado.</p>':'')+
   (data.errors.length?'<div class="error-list"><strong>Corrija as inconsistências antes de publicar:</strong><ul>'+data.errors.slice(0,15).map(x=>'<li>'+h(x.sheet)+' · linha '+x.row+': '+h(x.message)+'</li>').join('')+'</ul>'+(data.errors.length>15?'<p>... e outras '+(data.errors.length-15)+' inconsistências.</p>':'')+'</div>':'')+
-  '<div class="table-overflow"><table class="preview-table"><thead><tr><th>Cluster</th><th>Área</th><th>Nome</th><th>Nível</th><th>Telefone</th></tr></thead><tbody>'+data.valid.slice(0,12).map(c=>'<tr><td>'+h(c.cluster)+'</td><td>'+h(c.area)+'</td><td>'+h(c.full_name)+'</td><td>'+h(c.nivel)+'</td><td>'+h(c.phone_display)+'</td></tr>').join('')+'</tbody></table></div>'+
-  '<button class="btn primary publish" data-action="publish" '+(state.busy||!data.valid.length||data.errors.length||diff.duplicates?'disabled':'')+'>'+ic('check')+' '+(state.busy?'Publicando...':'Confirmar publicação')+'</button>'+(diff.duplicates?'<p class="warning">Há duplicidades; revise a base antes da publicação.</p>':'')+'</section>';
+  '<form id="importPreviewFilter" class="search-row"><label class="search-wrap"><span>Conferir registros</span><input name="previewQuery" type="search" placeholder="Nome, cidade, área ou aba" value="'+h(data.previewQuery||'')+'"/></label><button class="btn subtle" type="submit">Filtrar prévia</button></form><p>Exibindo '+Math.min(30,previewRows.length)+' de '+previewRows.length+' registros deste filtro.</p><div class="table-overflow"><table class="preview-table"><thead><tr><th>Cluster</th><th>Área</th><th>Cidade</th><th>Topologia / mercado</th><th>Nome</th><th>Nível</th><th>Telefone</th></tr></thead><tbody>'+previewRows.slice(0,30).map(c=>'<tr><td>'+h(c.cluster)+'</td><td>'+h(c.area)+'</td><td>'+h(c.cidade)+'</td><td>'+h(c.topologia)+'</td><td>'+h(c.full_name)+'</td><td>'+h(c.nivel)+'</td><td>'+h(c.phone_display)+'</td></tr>').join('')+'</tbody></table></div>'+
+  '<button class="btn primary publish" data-action="publish" '+(state.busy||!data.valid.length||data.errors.length||diff.duplicates||(data.warnings?.length&&!data.reviewed)?'disabled':'')+'>'+ic('check')+' '+(state.busy?'Publicando...':'Confirmar publicação')+'</button>'+(diff.duplicates?'<p class="warning">Há duplicidades; revise a base antes da publicação.</p>':'')+'</section>';
  }
- return '<div class="standalone"><div class="panel import-intro"><h3>'+ic('upload')+' Importação segura</h3><p>Envie Excel (.xlsx / .xls) ou CSV. O sistema valida nomes, telefones e clusters, calcula as mudanças e só publica com confirmação. Não deduz clusters pela ordem das abas.</p><label class="file-pick">Selecionar planilha<input type="file" id="importFile" accept=".csv,.xlsx,.xls" '+(state.busy?'disabled':'')+'/></label><p class="panel-hint">Máximo recomendado: 5 MB e 2.000 contatos. Cluster obrigatório em coluna ou nome da aba. Não envie dados de produção antes de configurar o banco independente.</p></div>'+preview+'<h3 class="subheading">Histórico de versões</h3>'+renderBatches()+'</div>';
+ return '<div class="standalone"><div class="panel import-intro"><h3>'+ic('upload')+' Importação segura</h3><p>Envie Excel (.xlsx / .xls) ou CSV. Aceita o modelo de escalonamento com blocos por nível, células mescladas e referência de cidades de MG. A leitura acontece neste navegador e só grava no banco após sua confirmação.</p><label class="file-pick">Selecionar planilha<input type="file" id="importFile" accept=".csv,.xlsx,.xls" '+(state.busy?'disabled':'')+'/></label><p class="panel-hint">Limites: 5 MB e 2.000 registros após distribuir as abrangências por cidade. Clusters são identificados por nome, nunca pela posição da aba.</p></div>'+preview+'<h3 class="subheading">Histórico de versões</h3>'+renderBatches()+'</div>';
 }
 function nicePage(){return '<div class="standalone"><div class="panel integration"><div class="integration-icon">'+ic('phone',35)+'</div><div><h3>Discagem via NICE MAX</h3><p>A interface está preparada para oferecer o botão <strong>Ligar via MAX</strong> ao lado do WhatsApp. A conexão <strong>não está ativa</strong>: depende de autorização, autenticação de agente, identificação de sessão e API liberada pela administração do NICE na Claro.</p><p>Não inserimos credenciais do MAX nem simulamos chamadas. Até a homologação, utilize WhatsApp ou copie o telefone.</p><span class="tag warn">Integração pendente</span></div></div></div>';}
 function usersPage(){
@@ -206,6 +210,7 @@ function copyText(text) {
  document.execCommand('copy');el.remove();return Promise.resolve();
 }
 root.addEventListener('submit',async e=>{
+ if(e.target.id==='importPreviewFilter'){e.preventDefault();if(state.upload){state.upload.previewQuery=String(new FormData(e.target).get('previewQuery')||'');render();}return;}
  if(e.target.id==='initialSetupForm'){
   e.preventDefault();if(state.busy)return;
   const form=new FormData(e.target),password=String(form.get('password')||'');
@@ -272,6 +277,7 @@ root.addEventListener('change',async e=>{
  if(el.id==='usersImportFile'){
   if(!userIsAdmin()||state.busy)return;
   const file=el.files?.[0];if(!file)return;
+  state.upload=null;
   if(file.size>1024*1024){toast('O arquivo de usuários excede 1 MB.','error');return;}
   try{
     const raw=await file.text();
@@ -284,21 +290,23 @@ root.addEventListener('change',async e=>{
  }
  if(el.matches('[data-filter]')){state.filters[el.dataset.filter]=el.value;render();return;}
  if(el.name==='mode'){state.importMode=el.value;render();return;}
+ if(el.id==='importReviewed'&&state.upload){state.upload.reviewed=el.checked;render();return;}
  if(el.id==='importFile'){
   const file=el.files?.[0];if(!file)return;
-  if(file.size>5*1024*1024){toast('Arquivo maior que 5 MB.','error');return;}
+  state.upload=null;
+  if(file.size>5*1024*1024){render();toast('Arquivo maior que 5 MB.','error');return;}
   try{
    let tables=[];
    if(/\.csv$/i.test(file.name)){tables=[{sheet:'CSV',rows:parseCsv(await file.text())}];}
    else if(/\.(xlsx|xls)$/i.test(file.name)){
     if(!window.XLSX)throw Error('Biblioteca de Excel indisponível. Verifique sua conexão.');
     const wb=window.XLSX.read(await file.arrayBuffer(),{type:'array',cellComments:true});
-    tables=wb.SheetNames.map(sheet=>({sheet,rows:window.XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,defval:'',raw:false})}));
+    tables=wb.SheetNames.map(sheet=>({sheet,rows:window.XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,defval:'',raw:false,range:0}),merges:wb.Sheets[sheet]['!merges']||[]}));
    }else throw Error('Use CSV, XLS ou XLSX.');
-   const parsed=parseTables(tables);
+   const parsed=parseWorkbook(tables);
    if(parsed.valid.length>2000)throw Error('Limite de 2.000 contatos por arquivo.');
    state.upload={name:file.name,...parsed};state.importMode='merge';render();
-  }catch(err){toast('Erro de leitura: '+err.message,'error');}
+  }catch(err){render();toast('Erro de leitura: '+err.message,'error');}
  }
 });
 root.addEventListener('click',async e=>{
@@ -399,6 +407,7 @@ root.addEventListener('click',async e=>{
  if(action==='publish'){
   if(!userIsAdmin()||!state.upload||state.busy)return;
   const data=state.upload,diff=importPreview(state.contacts,data.valid,state.importMode);
+  if(data.warnings?.length&&!data.reviewed){toast('Confira e marque a leitura dos avisos antes de publicar.','error');return;}
   if(data.errors.length||diff.duplicates||!data.valid.length){toast('Corrija os dados antes de publicar.','error');return;}
   if(state.importMode==='replace_clusters'&&!confirm('ATENÇÃO: substituir todos os contatos dos clusters '+diff.clusters.join(', ')+'? Outras regionais serão preservadas.'))return;
   if(!confirm('Confirmar publicação de '+data.valid.length+' contato(s) no banco independente?'))return;
