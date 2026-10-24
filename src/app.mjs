@@ -1,4 +1,4 @@
-import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,filterContacts,importPreview,isCurrentValidity,topologyValues} from './core.mjs';
+import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,filterContacts,importPreview,isCurrentValidity,topologyValues,consultationContacts} from './core.mjs';
 import {parseWorkbook} from './workbook.mjs';
 import {store} from './store.mjs';
 import {parseRoster} from './users.mjs';
@@ -33,7 +33,7 @@ const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
-const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'RJ',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
+const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 const toast=(message,kind='info')=>{
  state.notice={message,kind};
  root.querySelectorAll('.toast').forEach(el=>el.remove());
@@ -61,17 +61,24 @@ function renderShell(){
 }
 function clusterBar(){
  const labels={RJ:'Rio de Janeiro',ES:'Espírito Santo',MG:'Minas Gerais',CO:'Centro-Oeste',NE:'Nordeste',NO:'Norte',BA:'Bahia / Sergipe'};
- return '<div class="clusters" aria-label="Clusters">'+CLUSTERS.map(c=>'<button type="button" data-action="cluster" data-cluster="'+c+'" class="cluster '+(state.filters.cluster===c?'selected':'')+'"><span class="cluster-symbol">'+ic('map',20)+'</span><span><strong>'+c+'</strong><small>'+labels[c]+'</small></span></button>').join('')+'</div>';
+ return '<div class="clusters" aria-label="Regiões">'+CLUSTERS.map(c=>'<button type="button" data-action="cluster" data-cluster="'+c+'" aria-pressed="'+(state.filters.cluster===c)+'" aria-expanded="'+(state.filters.cluster===c)+'" aria-controls="region-subgroups" class="cluster '+(state.filters.cluster===c?'selected':'')+'"><span class="cluster-symbol">'+ic('map',20)+'</span><span><strong>'+c+'</strong><small>'+labels[c]+'</small></span></button>').join('')+'</div>';
 }
 function optionList(key,label) {
- const candidates=state.contacts.filter(c=>!state.filters.cluster||c.cluster===state.filters.cluster);
+ const candidates=state.contacts.filter(c=>c.cluster===state.filters.cluster&&c.active!==false&&(!state.filters.area||!c.area||normalizeText(c.area)===normalizeText(state.filters.area)));
  const vals=[...new Set(candidates.flatMap(c=>key==='topologia'?topologyValues(c[key]):[c[key]]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
  const current=state.filters[key]||'';
  const options='<option value="">Todos</option>'+vals.map(v=>'<option value="'+h(v)+'" '+(current===v?'selected':'')+'>'+h(v)+'</option>').join('');
  return '<label class="field"><span>'+label+'</span><select data-filter="'+key+'">'+options+'</select></label>';
 }
+function subgroupBar(){
+ if(!state.filters.cluster)return '<section id="region-subgroups" hidden></section>';
+ const areas=[...new Set(state.contacts.filter(c=>c.cluster===state.filters.cluster&&c.active!==false).map(c=>c.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+ const button=(area,label)=>'<button type="button" data-action="subgroup" data-area="'+h(area)+'" aria-pressed="'+(state.filters.area===area)+'" class="subgroup-button '+(state.filters.area===area?'selected':'')+(!area?' all':'')+'">'+h(label)+'</button>';
+ return '<section id="region-subgroups" class="region-subgroups" aria-label="Subgrupos da região '+h(state.filters.cluster)+'"><div class="subgroup-heading"><strong>Subgrupos de '+h(state.filters.cluster)+'</strong><span>Selecione uma área para refinar a consulta.</span></div>'+(areas.length?'<div class="subgroup-options" role="group" aria-label="Selecionar subgrupo">'+button('','Todos os subgrupos')+areas.map(a=>button(a,a)).join('')+'</div>':'<p class="panel-hint">Não há subgrupos cadastrados nesta região.</p>')+'</section>';
+}
 function filterUI(){
- return '<section class="filter-card"><form id="searchForm" class="search-row"><label class="search-wrap">'+ic('search',22)+'<input id="mainSearch" name="query" type="search" autocomplete="off" placeholder="Pesquisar cidade, responsável, cargo, área ou topologia..." value="'+h(state.filters.query)+'" aria-label="Pesquisar contatos"/></label><button type="submit" class="btn primary">'+ic('search')+' Buscar</button></form><p class="search-help">Pesquisa global, inclusive nomes parciais e sem acentos.</p>'+clusterBar()+'<div class="filter-grid">'+optionList('area','Área / Regional')+optionList('cidade','Cidade / Localidade')+optionList('topologia','Topologia')+optionList('cargo','Cargo')+optionList('nivel','Nível')+'<button type="button" class="btn clear-btn" data-action="clear">'+ic('refresh',16)+' Limpar filtros</button></div></section>';
+ const selected=Boolean(state.filters.cluster);
+ return '<section class="filter-card"><form id="searchForm" class="search-row"><label class="search-wrap">'+ic('search',22)+'<input id="mainSearch" name="query" type="search" autocomplete="off" placeholder="'+(selected?'Pesquisar cidade, responsável, cargo, área ou topologia...':'Selecione uma região para pesquisar')+'" value="'+h(state.filters.query)+'" aria-label="Pesquisar contatos" '+(!selected?'disabled':'')+'/></label><button type="submit" class="btn primary" '+(!selected?'disabled':'')+'>'+ic('search')+' Buscar</button></form><p class="search-help">'+(selected?'Pesquisa na região selecionada, inclusive nomes parciais e sem acentos.':'Escolha uma região abaixo para ver seus subgrupos e contatos.')+'</p>'+clusterBar()+subgroupBar()+(selected?'<div class="filter-grid subgroup-filters">'+optionList('cidade','Cidade / Localidade')+optionList('topologia','Topologia')+optionList('cargo','Cargo')+optionList('nivel','Nível')+'<button type="button" class="btn clear-btn" data-action="clear">'+ic('refresh',16)+' Limpar filtros</button></div>':'')+'</section>';
 }
 function contactCard(c){
  const validNumber=normalizePhone(c.phone_e164||c.phone_display||'');
@@ -92,8 +99,10 @@ function rightPanel(){
  return '<aside class="side-panels"><section class="panel"><h3>'+ic('bolt')+' Acesso rápido</h3><div class="quick-grid"><button data-action="quick" data-mode="city">'+ic('map')+' Localidades</button><button data-action="quick" data-mode="topology">'+ic('layout')+' Topologias</button><button data-action="nav" data-page="diretorio">'+ic('users')+' Diretório</button><button data-action="nav" data-page="favoritos">'+ic('star')+' Favoritos</button></div></section><section class="panel"><h3>'+ic('star')+' Favoritos <button data-action="nav" data-page="favoritos">Ver todos</button></h3>'+(fav.length?fav.map(c=>'<div class="mini-row"><span class="mini-avatar">'+ic('users',16)+'</span><div><strong>'+h(c.full_name)+'</strong><small>'+h(c.cluster)+' · '+h(c.cidade||'Regional')+'</small></div><button data-action="jump" data-id="'+h(c.id)+'" title="Localizar">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Marque a estrela de um contato para acessá-lo rapidamente.</p>')+'</section><section class="panel"><h3>'+ic('clock')+' Recentes</h3>'+(recent.length?recent.map(item=>'<div class="mini-row"><span class="mini-avatar">'+ic('search',16)+'</span><div><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></div><button data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster||'')+'" title="Pesquisar novamente">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Suas pesquisas aparecerão aqui.</p>')+'</section><section class="panel tip"><h3>'+ic('info')+' NICE MAX</h3><p>O botão de discagem permanece desativado até configuração oficial e testes autorizados com a Claro.</p><button class="small-link" data-action="nav" data-page="nice">Saiba mais →</button></section></aside>';
 }
 function consultation(){
- const visible=filterContacts(state.contacts,state.filters);
- return '<div class="workspace"><div class="primary-column">'+filterUI()+'<div class="results-heading"><div>'+ic('map',20)+'<h3>Escalonamento '+(state.filters.cluster?'— '+h(state.filters.cluster):'— Todos os clusters')+'</h3></div><span>Localidade: '+h(state.filters.cidade||'Todas')+'</span></div>'+contactList(visible)+'</div>'+rightPanel()+'</div>';
+ const selected=Boolean(state.filters.cluster);
+ const visible=consultationContacts(state.contacts,state.filters);
+ const results=selected?'<div class="results-heading"><div>'+ic('map',20)+'<h3>Escalonamento — '+h(state.filters.cluster)+(state.filters.area?' / '+h(state.filters.area):'')+'</h3></div><span>Localidade: '+h(state.filters.cidade||'Todas')+'</span></div>'+contactList(visible):'<section class="empty region-prompt" aria-live="polite">'+ic('map',32)+'<h3>Selecione uma região para começar</h3><p>Os subgrupos e os contatos aparecerão após a seleção.</p></section>';
+ return '<div class="workspace '+(!selected?'consultation-idle':'')+'"><div class="primary-column">'+filterUI()+results+'</div>'+(selected?rightPanel():'')+'</div>';
 }
 function directory(){
  const visible=filterContacts(state.contacts,{...state.filters,cluster:'',area:'',cidade:'',nivel:'',cargo:'',topologia:'',includeInactive:userIsAdmin()});
@@ -388,11 +397,12 @@ root.addEventListener('click',async e=>{
   finally{state.busy=false;render();}
   return;
  }
- if(action==='cluster'){state.filters.cluster=btn.dataset.cluster;state.filters.area='';state.filters.cidade='';state.filters.topologia='';state.filters.cargo='';state.filters.nivel='';render();return;}
+ if(action==='cluster'){const cluster=state.filters.cluster===btn.dataset.cluster?'':btn.dataset.cluster;state.filters={cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:cluster?state.filters.query:''};render();root.querySelector('[data-action="cluster"][data-cluster="'+btn.dataset.cluster+'"]')?.focus({preventScroll:true});return;}
+ if(action==='subgroup'){const area=btn.dataset.area||'';state.filters={...state.filters,area,cidade:'',topologia:'',cargo:'',nivel:''};render();Array.from(root.querySelectorAll('[data-action="subgroup"]')).find(b=>b.dataset.area===area)?.focus({preventScroll:true});return;}
  if(action==='clear'){state.filters={cluster:state.filters.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''};render();return;}
  if(action==='quick'){state.view='consultar';state.filters={...state.filters,query:'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};render();document.querySelector(btn.dataset.mode==='city'?'[data-filter="cidade"]':'[data-filter="topologia"]')?.focus();return;}
  if(action==='favorite'){const id=btn.dataset.id;state.favorites=state.favorites.includes(id)?state.favorites.filter(x=>x!==id):[id,...state.favorites];setStorage(preferenceKey('cop-favorites'),state.favorites);render();return;}
- if(action==='recent'){state.filters.query=btn.dataset.query||'';state.filters.cluster=btn.dataset.cluster||'';state.view='consultar';render();return;}
+ if(action==='recent'){state.filters={query:btn.dataset.query||'',cluster:btn.dataset.cluster||'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};state.view='consultar';render();return;}
  if(action==='jump'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c){state.filters={cluster:c.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:c.full_name};state.view='consultar';render();}return;}
  if(action==='copy'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c)return;try{await copyText(c.phone_display||c.phone_e164||'');toast('Telefone copiado.','success');}catch{toast('Cópia não permitida neste navegador.','error');}return;}
  if(action==='whatsapp'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c&&!store.demo&&whatsappUrl(c))window.open(whatsappUrl(c),'_blank','noopener,noreferrer');return;}

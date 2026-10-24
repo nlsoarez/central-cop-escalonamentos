@@ -6,3 +6,19 @@
 
 /* Gestão de contas individuais */
 .roster-panel{margin-top:16px}.roster-input{display:block;width:100%;min-height:150px;border:1px solid #dce6f0;border-radius:9px;padding:12px;resize:vertical;font-size:12px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.65;color:#234263;background:#fbfdff;white-space:pre-wrap}.roster-panel .toolbar{margin:13px 0 10px}.credentials{margin-top:16px;border-color:#c8a9e2;background:#fdfbff}.credentials h3{color:#59377e}.credentials h3 svg{color:#9a5bd0}.credentials code{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#533576;overflow-wrap:anywhere}.account-table{min-width:720px}.account-table .btn{font-size:10px;min-height:29px;padding:6px 8px}.users-intro{margin-bottom:16px}
+
+/* Seleção progressiva de região e subgrupo. */
+.workspace.consultation-idle{grid-template-columns:minmax(0,1fr)}
+.region-subgroups{margin:17px 0;padding:17px 0;border-top:1px solid #e4ecf6;border-bottom:1px solid #e4ecf6}
+.subgroup-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+.subgroup-heading strong{font-size:12px;color:#264969}.subgroup-heading span{font-size:11px;color:#687f99}
+.subgroup-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.subgroup-button{min-height:44px;padding:11px 13px;border:1px solid #d9e5f3;border-radius:9px;background:#f8fbff;color:#3f5d7d;font:inherit;font-size:11px;line-height:1.5;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.subgroup-button.all{grid-column:1/-1}.subgroup-button:hover{border-color:#89b5e8;background:#f0f6ff}
+.subgroup-button.selected{border-color:#0b70d4;background:#e9f3ff;color:#075aaf;box-shadow:inset 3px 0 0 #0b70d4;font-weight:700}
+.subgroup-button:focus-visible,.cluster:focus-visible{outline:3px solid #75acf3;outline-offset:3px}
+.subgroup-filters{grid-template-columns:repeat(4,minmax(0,1fr)) auto}
+.region-prompt{margin-top:18px;padding:38px 20px;color:#6e86a0}.region-prompt>svg{color:#4a8bd0}
+.search-wrap:has(input:disabled){background:#f5f8fc}.search-wrap input:disabled{cursor:not-allowed;color:#7c8fa5}
+@media(max-width:1350px){.subgroup-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.subgroup-filters .clear-btn{grid-column:1/-1;justify-self:start}}
+@media(max-width:560px){.subgroup-options{grid-template-columns:minmax(0,1fr)}.subgroup-heading{align-items:flex-start;flex-direction:column;gap:4px}.subgroup-button{font-size:11px;padding:11px}.region-prompt{padding:28px 15px}}

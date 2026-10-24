@@ -192,3 +192,8 @@ export function isCurrentValidity(c,date=new Date()){
   const today=date.toISOString().slice(0,10);
   return (!c.valid_from||today>=c.valid_from)&&(!c.valid_until||today<=c.valid_until);
 }
+// A consulta operacional só exibe contatos após escolher uma região.
+// O diretório completo continua usando filterContacts sem esta restrição de navegação.
+export function consultationContacts(contacts,filters={}){
+  return CLUSTERS.includes(filters.cluster)?filterContacts(contacts,filters):[];
+}

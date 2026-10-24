@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizePhone,resolveCluster,parseCsv,parseTables,filterContacts,importPreview,whatsappUrl} from '../src/core.mjs';
+import {normalizePhone,resolveCluster,parseCsv,parseTables,filterContacts,importPreview,whatsappUrl,consultationContacts} from '../src/core.mjs';
 
 test('DDD 55 nacional não é confundido com DDI 55',()=>{
  const p=normalizePhone('(55) 99999-0001');
@@ -55,6 +55,25 @@ test('contato regional pode aparecer junto a localidade, mas respeita área',()=
  ];
  const result=filterContacts(rows,{cluster:'RJ',area:'Baixada',cidade:'Nova Iguaçu'});
  assert.deepEqual(result.map(r=>r.id),['1','2']);
+});
+
+test('consulta sem região não mostra contatos, inclusive quando existe busca ou filtro antigo',()=>{
+ const rows=[{id:'1',cluster:'RJ',area:'Área A',full_name:'Pessoa Exemplo',active:true}];
+ assert.deepEqual(consultationContacts(rows,{}),[]);
+ assert.deepEqual(consultationContacts(rows,{cluster:'',area:'Área A',query:'Pessoa'}),[]);
+ assert.deepEqual(consultationContacts(rows,{cluster:'inexistente'}),[]);
+ assert.equal(filterContacts(rows,{}).length,1);
+});
+
+test('consulta selecionada respeita subgrupo e inclui gestores gerais da mesma região',()=>{
+ const rows=[
+  {id:'a',cluster:'RJ',area:'Área A',full_name:'A',active:true},
+  {id:'b',cluster:'RJ',area:'Área B',full_name:'B',active:true},
+  {id:'global',cluster:'RJ',area:'',full_name:'C',active:true},
+  {id:'other',cluster:'MG',area:'Área A',full_name:'D',active:true}
+ ];
+ assert.deepEqual(consultationContacts(rows,{cluster:'RJ',area:'Área A'}).map(c=>c.id),['a','global']);
+ assert.deepEqual(consultationContacts(rows,{cluster:'MG'}).map(c=>c.id),['other']);
 });
 test('importação padrão não remove contatos de outras regionais',()=>{
  const existing=[
