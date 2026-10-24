@@ -1,7 +1,7 @@
 import {mkdir,copyFile,writeFile,readdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
-export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs'];
+export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','assets/cop-noc-header.png','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs'];
 export function publicConfig(env){
  const url=env.COP_SUPABASE_URL||'',key=env.COP_SUPABASE_ANON_KEY||'';
  if(env.VERCEL_ENV==='production'&&(!url||!key))throw Error('Publicação de produção exige URL e chave pública do backend; demonstração não pode ser publicada em produção.');
