@@ -20,18 +20,18 @@ Portal independente para consulta operacional de contatos e níveis de escalonam
 
 ## Iniciar a interface
 
-Basta abrir `index.html` via servidor HTTP local. Por exemplo:
+Use Node.js 24 ou superior. Inicie o servidor HTTP local:
 
 ```bash
-python -m http.server 8080
+npm run dev
 ```
 
-Abra `http://localhost:8080`. Sem um backend configurado, a aplicação entra em **demonstração somente leitura**, com dados explicitamente fictícios e **sem links externos ativos**.
+Abra `http://127.0.0.1:8087`. Sem um backend configurado, a aplicação entra em **demonstração somente leitura**, com dados explicitamente fictícios e **sem links externos ativos**.
 
 ## Habilitar o banco real (Supabase NOVO)
 
 1. Crie um projeto Supabase **novo e separado**. Não reutilize o Supabase do SIM.
-2. Execute, em ordem, `supabase/migrations/001_initial.sql` e `supabase/migrations/002_individual_accounts.sql` no SQL Editor desse novo projeto.
+2. Execute, em ordem, `supabase/migrations/001_initial.sql`, `supabase/migrations/002_individual_accounts.sql` e `supabase/migrations/20261024053517_security_hardening.sql` no banco desse projeto novo. As funções atualizadas dependem da terceira migração e do diretório `supabase/functions/_shared`.
 3. Copie `config.example.js` para `config.js` e preencha somente a URL e a chave pública/anon do novo projeto. **Nunca use service_role no frontend**.
 4. Crie o usuário inicial pelo painel **Authentication** do novo Supabase. Depois, ative-o e atribua `admin` manualmente no SQL Editor:
 
@@ -44,7 +44,7 @@ where id = (select id from auth.users where email = 'ADMIN@EXEMPLO.COM');
 5. Publique os arquivos estáticos diretamente no projeto Vercel existente `central-cop-escalonamentos`. Inclua `config.js` somente com URL e chave pública do backend independente. Use integração Git nativa ou deploy direto. Nunca publique dados operacionais ou segredos no repositório público.
 6. Publique as Edge Functions `cop-manage-users` e `cop-change-password` **no Supabase novo** e habilite JWT verificado. Elas precisam de `SUPABASE_SERVICE_ROLE_KEY` **apenas no ambiente seguro das funções**, jamais no navegador ou no GitHub.
 7. No portal, o administrador abre **Usuários e senhas**, envia o arquivo CSV (`LOGIN;NOME`) ou cola a lista como tabela Markdown, valida e cria as contas. Os lotes são enviados de 20 em 20 para evitar excesso de chamadas.
-8. As senhas provisórias individuais são geradas no servidor e **exibidas somente no resultado da operação, sem opção de consulta posterior**, na sessão do administrador. Distribua cada senha apenas ao titular por um meio seguro. A alteração no primeiro acesso é obrigatória. O cadastro público fica desabilitado. A base de 58 colaboradores fornecida para importação é um arquivo privado de trabalho, não é incluída no código-fonte do repositório público.
+8. As senhas provisórias individuais são geradas no servidor e **exibidas somente no resultado da operação, sem opção de consulta posterior**, na sessão do administrador. Distribua cada senha apenas ao titular por um meio seguro. Não há exportação de senhas em arquivo. A alteração no primeiro acesso é obrigatória. O cadastro público fica desabilitado. A base de 58 colaboradores fornecida para importação é um arquivo privado de trabalho, não é incluída no código-fonte do repositório público.
 
 ### Convenção de importação
 
@@ -68,10 +68,13 @@ O Excel deve ter uma coluna **Cluster** ou nome de aba exatamente igual a um dos
 ## Testes
 
 ```bash
-node --test tests/*.test.mjs
+npm ci --ignore-scripts
+npm test
+npm run check
+npm run build
 ```
 
-Os testes cobrem normalização telefônica, identificação de cluster e regras de filtro/importação. A execução real da autenticação/RLS e o fluxo de upload devem ser validados em um Supabase de homologação independente antes de produção.
+A suíte inclui regras puras, handlers das Edge Functions com SDK simulado e migrações/RLS/importações em PostgreSQL embarcado. O provedor real de autenticação, gateway e upload precisam de homologação no backend independente. Consulte `docs/STATUS-2026-10-24.md` para evidências, limitações e cenários de navegador.
 
 ## Contas por matrícula
 
@@ -115,3 +118,11 @@ A vinculação GitHub → Vercel falhou porque a integração de login do GitHub
 
 Não foram enviados CSVs com dados de colaboradores para a implantação nem segredos de autenticação. Não usar para produção até que se crie um Supabase separado e sejam testadas as políticas RLS e as duas Edge Functions.
 
+
+## Preparação atual
+
+O [relatório técnico de 24/10/2026](docs/STATUS-2026-10-24.md) registra as correções e os bloqueios. **Ainda não liberado para operação:** backend independente não implantado e zero contas reais cadastradas nesta execução.
+
+O build usa uma lista de arquivos públicos em `scripts/build.mjs`. `npm run build` gera `dist/`; URL/chave pública opcionais vêm de `COP_SUPABASE_URL` e `COP_SUPABASE_ANON_KEY`. Nunca informe chave service_role ou secret. A Vercel usa `vercel.json`, sem GitHub Actions.
+
+Sessões são conferidas no banco e têm duração absoluta de 12 horas. Bloqueio/reset/troca revogam sessões. A troca de senha exige novo login. O limite de tentativas do endpoint público de login ainda precisa ser configurado e homologado no provedor/gateway; o limite das funções de gestão e troca de senha não o substitui.
