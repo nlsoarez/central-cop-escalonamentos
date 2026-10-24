@@ -39,7 +39,7 @@ set active = true, role = 'admin'
 where id = (select id from auth.users where email = 'ADMIN@EXEMPLO.COM');
 ```
 
-5. Para GitHub Pages, configure as mesmas constantes públicas em `config.js`. Não publique contatos operacionais, credenciais privadas ou arquivos reais no repositório público.
+5. Para GitHub Pages, configure **Settings → Secrets and variables → Actions → Variables** no repositório novo: `COP_SUPABASE_URL` e `COP_SUPABASE_ANON_KEY` (ambas são informações publicáveis, desde que o RLS esteja correto). O workflow gera `config.js` durante a publicação; não é necessário versioná-lo. Habilite GitHub Pages com fonte **GitHub Actions** em **Settings → Pages**. Não publique contatos operacionais, credenciais privadas ou arquivos reais no repositório público.
 6. O cadastro é fechado; novos usuários devem ser provisionados pela administração do Supabase. Não existe criação pública de contas no site.
 
 ### Convenção de importação

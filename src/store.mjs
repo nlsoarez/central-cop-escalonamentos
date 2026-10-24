@@ -37,7 +37,13 @@ export const store={
   async signOut(){if(client)expect(await client.auth.signOut());},
   async contacts(){
     if(!client)return DEMO_CONTACTS.map(c=>({...c}));
-    return expect(await client.from('cop_contacts').select('*').order('full_name',{ascending:true}));
+    const rows=[];
+    for(let from=0;from<50000;from+=500){
+      const page=expect(await client.from('cop_contacts').select('*').order('id',{ascending:true}).range(from,from+499));
+      rows.push(...page);
+      if(page.length<500)break;
+    }
+    return rows;
   },
   async saveContact(values){
     if(!client)throw Error('Modo demonstração: alterações desativadas.');

@@ -87,7 +87,7 @@ function consultation(){
  return '<div class="workspace"><div class="primary-column">'+filterUI()+'<div class="results-heading"><div>'+ic('map',20)+'<h3>Escalonamento '+(state.filters.cluster?'— '+state.filters.cluster:'— Todos os clusters')+'</h3></div><span>Localidade: '+h(state.filters.cidade||'Todas')+'</span></div>'+contactList(visible)+'</div>'+rightPanel()+'</div>';
 }
 function directory(){
- const visible=filterContacts(state.contacts,{...state.filters,cluster:'',area:'',cidade:'',nivel:'',cargo:'',topologia:''});
+ const visible=filterContacts(state.contacts,{...state.filters,cluster:'',area:'',cidade:'',nivel:'',cargo:'',topologia:'',includeInactive:userIsAdmin()});
  return '<div class="standalone"><div class="toolbar"><form id="directoryForm" class="toolbar-search">'+ic('search')+'<input name="query" type="search" id="directorySearch" placeholder="Buscar em todo o diretório" value="'+h(state.filters.query)+'"/><button class="icon-btn" type="submit" title="Buscar">'+ic('search')+'</button></form><span class="pill">'+visible.length+' registros</span>'+(userIsAdmin()?'<button class="btn primary" data-action="new">'+ic('edit')+' Novo contato</button>':'')+'</div>'+contactList(visible)+'</div>';
 }
 function favoritesPage(){const list=state.favorites.map(id=>state.contacts.find(c=>c.id===id)).filter(Boolean);return '<div class="standalone"><p class="section-description">Seus contatos favoritos são armazenados somente neste navegador.</p>'+contactList(list)+'</div>';}

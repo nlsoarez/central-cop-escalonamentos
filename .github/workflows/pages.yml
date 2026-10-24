@@ -19,6 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Configurar chave publicável do Supabase independente
+        env:
+          COP_SUPABASE_URL: ${{ vars.COP_SUPABASE_URL }}
+          COP_SUPABASE_ANON_KEY: ${{ vars.COP_SUPABASE_ANON_KEY }}
+        run: |
+          node -e "const fs=require('fs');fs.writeFileSync('config.js','window.CENTRAL_COP_CONFIG = '+JSON.stringify({supabaseUrl:process.env.COP_SUPABASE_URL||'',supabaseAnonKey:process.env.COP_SUPABASE_ANON_KEY||''})+';\\n')"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
