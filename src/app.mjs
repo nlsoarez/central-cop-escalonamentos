@@ -127,7 +127,7 @@ function usersPage(){
   '<section class="panel credentials" aria-label="Senhas provisórias"><h3>'+ic('alert')+' Credenciais geradas — visualização temporária</h3><p>As senhas são <strong>individuais</strong>, geradas aleatoriamente e deverão ser trocadas no primeiro acesso. Não são salvas no portal. Entregue cada senha exclusivamente ao seu titular por canal seguro. Caso perca uma senha, utilize Redefinir.</p><div class="toolbar"><button class="btn subtle" data-action="export-credentials">Exportar CSV confidencial</button><button class="btn subtle" data-action="clear-credentials">Apagar senhas da tela</button></div><div class="table-overflow"><table class="preview-table account-table"><thead><tr><th>Matrícula</th><th>Nome</th><th>Situação</th><th>Senha provisória</th></tr></thead><tbody>'+
   credentials.map(u=>'<tr><td><strong>'+h(u.login)+'</strong></td><td>'+h(u.nome)+'</td><td>'+h(({created:'Criado',exists:'Já cadastrado',error:'Erro'})[u.status]||'Desconhecido')+'</td><td>'+(u.temporaryPassword?'<code>'+h(u.temporaryPassword)+'</code> <button class="icon-btn" data-action="copy-password" data-login="'+h(u.login)+'" title="Copiar senha">'+ic('copy')+'</button>':'—')+'</td></tr>').join('')+'</tbody></table></div></section>':'';
  return '<div class="standalone"><section class="panel users-intro"><h3>'+ic('users')+' Contas individuais</h3><p>O acesso será realizado por <strong>matrícula + senha pessoal</strong>. Cada usuário recebe uma senha provisória exclusiva e precisará substituí-la no primeiro login. A senha definitiva fica protegida pelo Supabase Auth. Matrículas e nomes não são publicados no GitHub.</p><p class="panel-hint">Cadastro restrito ao administrador. O portal e a autenticação são independentes do SIM.</p></section>'+
- '<section class="panel roster-panel"><h3>Importar usuários</h3><p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
+ '<section class="panel roster-panel"><h3>Importar usuários</h3><p>Cole a tabela de LOGIN e NOME no formato Markdown, CSV ou colunas separadas por TAB. Serão aceitos até 100 usuários por importação. Contas já existentes não serão recriadas.</p><label class="file-pick">Selecionar CSV de usuários<input type="file" id="usersImportFile" accept=".csv,.txt" '+(state.busy?'disabled':'')+'/></label><label class="field"><span>Base de usuários</span><textarea id="rosterText" class="roster-input" placeholder="LOGIN;NOME&#10;F000001;NOME EXEMPLO" rows="6" '+(state.busy?'disabled':'')+'>'+h(state.rosterRaw)+'</textarea></label><div class="toolbar"><button class="btn subtle" data-action="validate-roster" '+(state.busy?'disabled':'')+'>'+ic('check')+' Validar lista</button>'+(ready?'<button class="btn primary" data-action="create-roster" '+(state.busy?'disabled':'')+'>'+ic('users')+' '+(state.busy?'Cadastrando...':'Criar contas individuais')+'</button>':'')+'</div>'+
  (validated?'<p><strong>'+validated.data.length+'</strong> matrícula(s) válidas e <strong>'+validated.errors.length+'</strong> inconsistência(s).</p>'+
  (validated.errors.length?'<div class="error-list"><ul>'+validated.errors.slice(0,12).map(x=>'<li>Linha '+x.line+': '+h(x.message)+'</li>').join('')+'</ul></div>':'')+
  '<div class="table-overflow"><table class="preview-table"><thead><tr><th>Matrícula</th><th>Nome</th></tr></thead><tbody>'+validated.data.slice(0,12).map(x=>'<tr><td>'+h(x.login)+'</td><td>'+h(x.nome)+'</td></tr>').join('')+'</tbody></table></div><p class="panel-hint">Visualização parcial de até 12 registros.</p>':'')+'</section>'+
@@ -224,6 +224,19 @@ root.addEventListener('submit',async e=>{
 });
 root.addEventListener('change',async e=>{
  const el=e.target;
+ if(el.id==='usersImportFile'){
+  if(!userIsAdmin()||state.busy)return;
+  const file=el.files?.[0];if(!file)return;
+  if(file.size>1024*1024){toast('O arquivo de usuários excede 1 MB.','error');return;}
+  try{
+    const raw=await file.text();
+    const parsed=parseRoster(raw);
+    if(parsed.data.length>100)throw Error('Limite de 100 pessoas por arquivo.');
+    state.rosterRaw=raw;state.roster=parsed;render();
+    if(parsed.errors.length)toast('Foram encontradas inconsistências na lista. Corrija antes de cadastrar.','error');
+  }catch(err){toast('Erro ao ler CSV: '+err.message,'error');}
+  return;
+ }
  if(el.matches('[data-filter]')){state.filters[el.dataset.filter]=el.value;render();return;}
  if(el.name==='mode'){state.importMode=el.value;render();return;}
  if(el.id==='importFile'){

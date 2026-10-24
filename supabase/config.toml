@@ -1,0 +1,6 @@
+# Configuração exclusiva do Central COP. Nunca apontar para o projeto SIM.
+[functions.cop-manage-users]
+verify_jwt = true
+
+[functions.cop-change-password]
+verify_jwt = true

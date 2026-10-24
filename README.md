@@ -43,8 +43,8 @@ where id = (select id from auth.users where email = 'ADMIN@EXEMPLO.COM');
 
 5. Para GitHub Pages, configure **Settings → Secrets and variables → Actions → Variables** no repositório novo: `COP_SUPABASE_URL` e `COP_SUPABASE_ANON_KEY` (ambas são informações publicáveis, desde que o RLS esteja correto). O workflow gera `config.js` durante a publicação; não é necessário versioná-lo. Habilite GitHub Pages com fonte **GitHub Actions** em **Settings → Pages**. Não publique contatos operacionais, credenciais privadas ou arquivos reais no repositório público.
 6. Publique as Edge Functions `cop-manage-users` e `cop-change-password` **no Supabase novo** e habilite JWT verificado. Elas precisam de `SUPABASE_SERVICE_ROLE_KEY` **apenas no ambiente seguro das funções**, jamais no navegador ou no GitHub.
-7. No portal, o administrador abre **Usuários e senhas**, cola a lista no formato `LOGIN;NOME` (ou tabela Markdown), valida e cria as contas. Os lotes são enviados de 20 em 20 para evitar excesso de chamadas.
-8. As senhas provisórias individuais são geradas no servidor e **exibidas uma única vez**, na sessão do administrador. Distribua cada senha apenas ao titular por um meio seguro. A alteração no primeiro acesso é obrigatória. O cadastro público fica desabilitado.
+7. No portal, o administrador abre **Usuários e senhas**, envia o arquivo CSV (`LOGIN;NOME`) ou cola a lista como tabela Markdown, valida e cria as contas. Os lotes são enviados de 20 em 20 para evitar excesso de chamadas.
+8. As senhas provisórias individuais são geradas no servidor e **exibidas somente no resultado da operação, sem opção de consulta posterior**, na sessão do administrador. Distribua cada senha apenas ao titular por um meio seguro. A alteração no primeiro acesso é obrigatória. O cadastro público fica desabilitado. A base de 58 colaboradores fornecida para importação é um arquivo privado de trabalho, não é incluída no código-fonte do repositório público.
 
 ### Convenção de importação
 
