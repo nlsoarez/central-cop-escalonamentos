@@ -61,6 +61,7 @@ button{touch-action:manipulation}button,input,select{accent-color:var(--brand)}
 @media(min-width:761px) and (max-width:1050px){.btn,.icon-btn,.contact-actions .btn,.contact-actions .icon-btn{min-height:44px}.icon-btn{min-width:44px}}
 
 /* Region selection: geographic marks, clear selected state and quiet hierarchy. */
+.brand-icon{display:block;object-fit:contain;flex-shrink:0;border-radius:10px}.sidebar-brand .logo{width:48px;height:48px;background:transparent!important;border-radius:10px}.brand-mini .brand-icon{border-radius:6px}.auth-logo.official-logo{width:72px;height:72px;background:transparent!important;border-radius:14px}
 .filter-card{padding:24px}.filter-intro{margin-bottom:22px}.filter-intro h3{font-size:17px;letter-spacing:-.3px}.filter-intro p{font-size:12px}
 .selection-hint{border-radius:20px;background:var(--brand-soft);color:var(--brand-dark);border-color:var(--brand-line);padding:7px 12px;font-weight:600}
 .clusters{gap:10px}.cluster{position:relative;flex-direction:column;gap:10px;min-height:128px;padding:16px 8px 14px;background:var(--surface);border-radius:12px}
