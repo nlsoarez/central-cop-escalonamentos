@@ -101,3 +101,4 @@ Relato recebido em Android Chrome/PWA: compartilhamento rejeitado pelo aparelho.
 - Chamadas concorrentes de compartilhamento são bloqueadas. Nenhum dado adicional é salvo ou enviado automaticamente.
 - Validação: 100 testes aprovados, sintaxe e build aprovados. Navegador em 390 px com contatos sintéticos: recusa de arquivo simulada, revalidação de sessão, alternativa preservada e texto entregue ao substituto local da API; sem overflow. Evidência: `output/mobile/compartilhar-texto.png`.
 - Reversão: deployment anterior `dpl_5EM8cuMRqF4ZH7pDBdiLE4DeYbou`. Confirmação do compartilhamento nativo no Android físico depende do teste do usuário após atualizar o portal.
+- Publicado: commit `8c9d9a0`, deployment `dpl_BJqir8arqcuHitvoTeEJinkL55EG` READY no endereço principal. Worker `cop-public-static-aba26a8adb67be73`. Página, módulos corrigidos e worker validados em HTTP 200 com CSP preservada.
