@@ -5,12 +5,15 @@ import {parseRoster} from './users.mjs';
 import {dialUrl,operationalNotes,shareContact,contactShareText} from './contact-actions.mjs';
 import {createSessionRecovery} from './session-lifecycle.mjs';
 import {setupPwa} from './pwa.mjs';
+import {regionMap} from './region-maps.mjs';
+import {openMaxWindow} from './max-window.mjs';
 
 const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
 if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 const iconPaths={
+ moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
  share:'<path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8"/>',
  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
  layout:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M9 9h12"/>',
@@ -60,17 +63,21 @@ function uiHeader(){
  return '<header class="topbar"><div class="brand-mini">'+ic('bolt',20)+'<strong>Central COP</strong><span>/ Operação de rede</span></div><div class="top-actions"><span class="status-pill '+(store.demo?'demo':'live')+'"><i></i>'+(store.demo?'Demonstração':'Base conectada')+'</span><div class="avatar" title="'+h(state.user?.email||'Modo demonstração')+'">'+h((state.user?.display_name||'COP').slice(0,2).toUpperCase())+'</div><span class="user-name">'+h(state.user?.display_name||'Demonstração')+'</span>'+(store.configured?'<button class="btn subtle account-password" data-action="change-password">Alterar senha</button><button class="icon-btn" data-action="logout" title="Sair" aria-label="Sair da conta">'+ic('logout')+'</button>':'')+'</div></header>'+
  '<section class="hero"><div class="hero-copy"><div class="eyebrow">CENTRAL DE OPERAÇÕES</div><h1>Central COP</h1><div class="hero-subtitle">ESCALONAMENTOS</div><p>Gestão e consulta de escalonamentos operacionais.</p><span class="hero-data">'+ic('clock',13)+' Atualização: '+h(date)+'</span></div><div class="hero-summary" aria-label="Resumo do diretório"><div><span>Regiões atendidas</span><strong>'+String(CLUSTERS.length).padStart(2,'0')+'</strong></div><div><span>Registros na base</span><strong>'+records+'</strong></div></div></section>';
 }
+function themeButton(){
+ const dark=document.documentElement.dataset.theme==='dark';
+ return '<button type="button" class="nav-link theme-toggle" data-action="theme" aria-pressed="'+dark+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon')+'<span>Tema '+(dark?'claro':'escuro')+'</span></button>';
+}
 function renderShell(){
  const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+
- '<div class="nav-divider"></div>'+navButton('nice','NICE MAX','phone')+
+ '<div class="nav-divider"></div>'+navButton('nice','NICE MAX','phone')+themeButton()+
  (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'');
  return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+ic('bolt',27)+'</div><div><strong>Central COP</strong><small>OPERAÇÃO DE REDE</small></div></div><div class="nav-caption">NAVEGAÇÃO</div><nav aria-label="Menu principal">'+nav+'<button class="nav-link mobile-only" data-action="mobile-menu" aria-expanded="'+Boolean(state.mobileMenu)+'">'+ic('settings')+'<span>Mais</span></button></nav><div class="sidebar-foot">'+ic('info')+'<span>Ambiente interno<small>Central de Operações</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
- (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
+ (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+themeButton()+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
  (state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'')+(state.modal?renderModal():'');
 }
 function clusterBar(){
  const labels={RJ:'Rio de Janeiro',ES:'Espírito Santo',MG:'Minas Gerais',CO:'Centro-Oeste',NE:'Nordeste',NO:'Norte',BA:'Bahia / Sergipe'};
- return '<div class="clusters" aria-label="Regiões">'+CLUSTERS.map(c=>'<button type="button" data-action="cluster" data-cluster="'+c+'" aria-pressed="'+(state.filters.cluster===c)+'" aria-expanded="'+(state.filters.cluster===c)+'" aria-controls="region-subgroups" class="cluster '+(state.filters.cluster===c?'selected':'')+'"><span class="cluster-symbol">'+ic('map',20)+'</span><span><strong>'+c+'</strong><small>'+labels[c]+'</small></span></button>').join('')+'</div>';
+ return '<div class="clusters" aria-label="Regiões">'+CLUSTERS.map(c=>'<button type="button" data-action="cluster" data-cluster="'+c+'" aria-pressed="'+(state.filters.cluster===c)+'" aria-expanded="'+(state.filters.cluster===c)+'" aria-controls="region-subgroups" class="cluster '+(state.filters.cluster===c?'selected':'')+'"><span class="cluster-symbol">'+regionMap(c)+'</span><span class="cluster-label"><strong>'+c+'</strong><small>'+labels[c]+'</small></span><span class="cluster-check">'+ic(state.filters.cluster===c?'check':'chevron',13)+'</span></button>').join('')+'</div>';
 }
 function optionList(key,label) {
  const candidates=state.contacts.filter(c=>c.cluster===state.filters.cluster&&c.active!==false&&(!state.filters.area||!c.area||normalizeText(c.area)===normalizeText(state.filters.area)));
@@ -82,7 +89,7 @@ function optionList(key,label) {
 function subgroupBar(){
  if(!state.filters.cluster)return '<section id="region-subgroups" hidden></section>';
  const areas=[...new Set(state.contacts.filter(c=>c.cluster===state.filters.cluster&&c.active!==false).map(c=>c.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
- const button=(area,label)=>'<button type="button" data-action="subgroup" data-area="'+h(area)+'" aria-pressed="'+(state.filters.area===area)+'" class="subgroup-button '+(state.filters.area===area?'selected':'')+(!area?' all':'')+'">'+h(label)+'</button>';
+ const button=(area,label)=>'<button type="button" data-action="subgroup" data-area="'+h(area)+'" aria-pressed="'+(state.filters.area===area)+'" class="subgroup-button '+(state.filters.area===area?'selected':'')+(!area?' all':'')+'"><span class="subgroup-mark">'+ic(state.filters.area===area?'check':'map',15)+'</span><span>'+h(label)+'</span>'+ic('chevron',13)+'</button>';
  return '<section id="region-subgroups" class="region-subgroups" aria-label="Subgrupos da região '+h(state.filters.cluster)+'"><div class="subgroup-heading"><strong>Subgrupos de '+h(state.filters.cluster)+'</strong><span>Selecione uma área para refinar a consulta.</span></div>'+(areas.length?'<div class="subgroup-options" role="group" aria-label="Selecionar subgrupo">'+button('','Todos os subgrupos')+areas.map(a=>button(a,a)).join('')+'</div>':'<p class="panel-hint">Não há subgrupos cadastrados nesta região.</p>')+'</section>';
 }
 function filterUI(){
@@ -117,7 +124,7 @@ function contactList(list){
 function rightPanel(){
  const fav=state.favorites.map(id=>state.contacts.find(c=>c.id===id)).filter(Boolean).slice(0,4);
  const recent=state.recent.slice(0,5);
- return '<aside class="side-panels"><section class="panel"><h3>'+ic('bolt')+' Acesso rápido</h3><div class="quick-grid"><button data-action="quick" data-mode="city">'+ic('map')+' Localidades</button><button data-action="quick" data-mode="topology">'+ic('layout')+' Topologias</button><button data-action="nav" data-page="diretorio">'+ic('users')+' Diretório</button><button data-action="nav" data-page="favoritos">'+ic('star')+' Favoritos</button></div></section><section class="panel"><h3>'+ic('star')+' Favoritos <button data-action="nav" data-page="favoritos">Ver todos</button></h3>'+(fav.length?fav.map(c=>'<div class="mini-row"><span class="mini-avatar">'+ic('users',16)+'</span><div><strong>'+h(c.full_name)+'</strong><small>'+h(c.cluster)+' · '+h(c.cidade||'Regional')+'</small></div><button data-action="jump" data-id="'+h(c.id)+'" title="Localizar">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Marque a estrela de um contato para acessá-lo rapidamente.</p>')+'</section><section class="panel"><h3>'+ic('clock')+' Recentes</h3>'+(recent.length?recent.map(item=>'<div class="mini-row"><span class="mini-avatar">'+ic('search',16)+'</span><div><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></div><button data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster||'')+'" title="Pesquisar novamente">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Suas pesquisas aparecerão aqui.</p>')+'</section><section class="panel tip"><h3>'+ic('info')+' NICE MAX</h3><p>O botão de discagem permanece desativado até configuração oficial e testes autorizados com a Claro.</p><button class="small-link" data-action="nav" data-page="nice">Saiba mais →</button></section></aside>';
+ return '<aside class="side-panels"><section class="panel"><h3>'+ic('bolt')+' Acesso rápido</h3><div class="quick-grid"><button data-action="quick" data-mode="city">'+ic('map')+' Localidades</button><button data-action="quick" data-mode="topology">'+ic('layout')+' Topologias</button><button data-action="nav" data-page="diretorio">'+ic('users')+' Diretório</button><button data-action="nav" data-page="favoritos">'+ic('star')+' Favoritos</button></div></section><section class="panel"><h3>'+ic('star')+' Favoritos <button data-action="nav" data-page="favoritos">Ver todos</button></h3>'+(fav.length?fav.map(c=>'<div class="mini-row"><span class="mini-avatar">'+ic('users',16)+'</span><div><strong>'+h(c.full_name)+'</strong><small>'+h(c.cluster)+' · '+h(c.cidade||'Regional')+'</small></div><button data-action="jump" data-id="'+h(c.id)+'" title="Localizar">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Marque a estrela de um contato para acessá-lo rapidamente.</p>')+'</section><section class="panel"><h3>'+ic('clock')+' Recentes</h3>'+(recent.length?recent.map(item=>'<div class="mini-row"><span class="mini-avatar">'+ic('search',16)+'</span><div><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></div><button data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster||'')+'" title="Pesquisar novamente">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Suas pesquisas aparecerão aqui.</p>')+'</section><section class="panel tip"><h3>'+ic('info')+' NICE MAX</h3><p>Abra o MAX em uma janela compacta para acompanhar seus atendimentos. Confirme a ligação no discador.</p><button class="small-link" data-action="nav" data-page="nice">Abrir NICE MAX ↗</button></section></aside>';
 }
 function consultation(){
  const selected=Boolean(state.filters.cluster);
@@ -157,7 +164,7 @@ function importPage(){
  }
  return '<div class="standalone"><div class="panel import-intro"><h3>'+ic('upload')+' Importação segura</h3><p>Envie Excel (.xlsx / .xls) ou CSV. Aceita o modelo de escalonamento com blocos por nível, células mescladas e referência de cidades de MG. A leitura acontece neste navegador e só grava no banco após sua confirmação.</p><label class="file-pick">Selecionar planilha<input type="file" id="importFile" accept=".csv,.xlsx,.xls" '+(state.busy?'disabled':'')+'/></label><p class="panel-hint">Limites: 5 MB e 2.000 registros após distribuir as abrangências por cidade. Clusters são identificados por nome, nunca pela posição da aba.</p></div>'+preview+'<h3 class="subheading">Histórico de versões</h3>'+renderBatches()+'</div>';
 }
-function nicePage(){return '<div class="standalone"><div class="panel integration"><div class="integration-icon">'+ic('phone',35)+'</div><div><h3>Ligação externa pelo MAX</h3><p>Ambiente informado: <strong>cc.claro.com.br</strong>. O objetivo é iniciar uma ligação externa para o contato selecionado usando o MAX tradicional.</p><span class="tag warn">Aguardando liberação da integração</span><p>A discagem permanece desativada. Abrir o MAX ou copiar um telefone não inicia uma ligação pelo portal.</p><h4>O que falta para conectar</h4><ul><li>Confirmar com a equipe NICE a integração compatível com a sessão já aberta no MAX.</li><li>Liberar autenticação e permissões da aplicação, skill de saída e formato de discagem.</li><li>Definir um destino autorizado para testar solicitação, andamento e encerramento da chamada.</li></ul><p>A ponte de mensagens documentada para o MAX permite eventos e controles de chamadas, mas não lista um comando para discar um novo número. A extensão de clique para ligar do Agent Workspace não confirma compatibilidade com este ambiente.</p><p>Enquanto isso, use <strong>Copiar</strong> no contato e faça a discagem manual no MAX, conferindo o número e a skill de saída.</p><p><a href="https://help.nice-incontact.com/content/agent/agentapplicationadministration/max/maxpostmessageintegration.htm" target="_blank" rel="noopener noreferrer">Documentação oficial de integração do MAX</a></p></div></div></div>';}
+function nicePage(){return '<section class="panel integration"><div class="integration-icon">'+ic('phone',35)+'</div><div><h3>NICE MAX</h3><p>Abra o discador em uma janela separada. Use a extensão Assistente COP para preparar o telefone e confirme a ligação no MAX.</p><button class="btn primary" data-action="nav" data-page="nice">Abrir NICE MAX ↗</button></div></section>';}
 function usersPage(){
  if(!userIsAdmin())return '<div class="empty">Acesso restrito.</div>';
  const validated=state.roster;
@@ -386,12 +393,17 @@ root.addEventListener('click',async e=>{
  }
  const action=btn.dataset.action;
  if(!action)return;
+ if(action==='theme'){
+  const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
+  document.documentElement.dataset.theme=next;try{localStorage.setItem('cop-theme',next);}catch{}
+  captureDraft();render();return;
+ }
  if(action==='retry-session'){await recoverSession({reload:true});return;}
  if(state.connection!=='online')return;
  if(action==='mobile-menu'){state.mobileMenu=!state.mobileMenu;render();return;}
  if(action==='change-password'){state.credentials=[];state.view='senha';render();return;}
  if(action==='nav'){
-  if(btn.dataset.page==='nice'&&mobile())return;
+  if(btn.dataset.page==='nice'){if(!mobile())openMaxWindow();return;}
   state.mobileMenu=false;
   if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
     state.credentials=[];state.roster=null;state.rosterRaw='';
@@ -525,7 +537,7 @@ const recoverSession=createSessionRecovery({
   if(!store.demo)state.user=user;
   if(changed){loadPreferences();if(!store.demo)restoreConsultation();}
   if(needsData)await refresh();
-  state.connection=document.visibilityState==='hidden'?'checking':'online';state.loading=false;if(needsData)render();
+  state.connection=document.visibilityState==='hidden'&&mobile()?'checking':'online';state.loading=false;if(needsData)render();
  }
 });
 init();
@@ -535,8 +547,8 @@ window.addEventListener('hashchange',()=>{
  if(token){state.setupToken=token;history.replaceState(null,'',location.pathname+location.search);render();}
 });
 document.addEventListener('visibilitychange',()=>{
- if(document.visibilityState==='hidden'){captureDraft();rememberConsultation();state.connection='checking';render();}
- else if(!store.configurationError)recoverSession({reload:true});
+ if(document.visibilityState==='hidden'){captureDraft();rememberConsultation();if(mobile()){state.connection='checking';render();}}
+ else if(!store.configurationError)recoverSession({quiet:!mobile()&&state.connection==='online'&&Boolean(state.user?.active),reload:mobile()});
 });
 window.addEventListener('pageshow',event=>{if(event.persisted)recoverSession({reload:true});});
 window.addEventListener('offline',()=>{captureDraft();state.connection='unavailable';render();});
