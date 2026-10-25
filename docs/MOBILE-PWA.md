@@ -77,3 +77,16 @@ Para cada aparelho:
 - [Instalação PWA](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Trigger_install_prompt): dependência de suporte do navegador.
 - [Cache PWA](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Caching): cache explícito e limitado.
 - [Web Share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share) e [canShare](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/canShare): gesto do usuário e detecção de suporte a arquivos.
+
+## Publicação e verificação em produção
+
+- Código publicado no GitHub: commit `4621110` — Add mobile PWA with resilient sessions and contact actions.
+- Deployment Vercel: `dpl_5EM8cuMRqF4ZH7pDBdiLE4DeYbou`, produção READY.
+- URL principal: https://central-cop-escalonamentos.vercel.app/.
+- Worker gerado: `cop-public-static-82eb305a3def178c`; arquivo servido sem placeholder e com no-cache/no-store. Manifest servido com application/manifest+json e revalidação.
+- Página, manifest, worker, offline e ícones retornaram HTTP 200. API atual preservada e consulta anônima aos contatos retornou 401.
+- Em navegador de produção, uma sessão existente foi recuperada sem digitar senha e o diretório de 1841 registros foi carregado. Em viewport mobile, RJ exibiu 68 contatos com links tel, ações de compartilhar, sem dados técnicos, sem MAX visível e sem overflow.
+- Após recarga real dessa página, a sessão continuou autenticada e RJ/68 registros foram restaurados. Não houve discagem, WhatsApp real ou compartilhamento de contatos operacionais durante a verificação.
+- Demonstração de cartão com dados fictícios: `output/mobile/cartao-mobile.png`.
+
+Os testes físicos Android/iPhone listados acima continuam pendentes. Não foram substituídos pela recuperação de sessão observada no navegador desktop ou pela simulação de larguras.
