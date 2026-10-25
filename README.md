@@ -18,6 +18,9 @@ Portal independente para consulta operacional de contatos e níveis de escalonam
 - Importação de usuários pelo administrador, senhas provisórias fortes **diferentes por pessoa**, troca obrigatória no primeiro login e redefinição individual.
 - Botão NICE MAX ilustrativo **desativado** até integração autorizada e homologada.
 
+O levantamento técnico e a solicitação de liberação para a equipe de telefonia estão em [Integração MAX](docs/INTEGRACAO-MAX.md).
+O [Assistente MAX para Chrome/Edge](extension/README.md) prepara o telefone para preenchimento manual, sem iniciar ligações; validação no navegador instalado pendente.
+
 ## Iniciar a interface
 
 Use Node.js 24 ou superior. Inicie o servidor HTTP local:

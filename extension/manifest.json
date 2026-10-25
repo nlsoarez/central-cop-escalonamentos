@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Central COP — Assistente MAX",
+  "version": "0.1.6",
+  "description": "Envia um telefone selecionado no Central COP para conferência e preenchimento manual no MAX. Não inicia ligações.",
+  "minimum_chrome_version": "120",
+  "host_permissions": ["https://max.niceincontact.com/*"],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [
+    {"matches": ["https://central-cop-escalonamentos.vercel.app/*"], "js": ["policy.js", "portal.js"], "all_frames": false},
+    {"matches": ["https://max.niceincontact.com/index.html"], "js": ["policy.js", "max.js"], "all_frames": false}
+  ]
+}
