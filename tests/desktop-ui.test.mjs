@@ -2,17 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-import {MAX_URL,maxWindowFeatures,openMaxWindow} from '../src/max-window.mjs';
 import {regionMap} from '../src/region-maps.mjs';
 import {createSessionRecovery} from '../src/session-lifecycle.mjs';
 
-test('MAX abre somente o endereço autorizado em popup compacto sem acesso ao opener',()=>{
- let args;
- openMaxWindow({screen:{availWidth:1920,availHeight:1080},open:(...a)=>args=a});
- assert.equal(args[0],MAX_URL);assert.equal(args[0],'https://max.niceincontact.com/index.html');
- assert.match(args[2],/popup=yes,width=360,height=820/);assert.match(args[2],/noopener,noreferrer/);
- assert.match(maxWindowFeatures({availWidth:320,availHeight:700}),/width=320,height=700/);
-});
 test('tema inicial aceita apenas preferência local clara ou escura, inclusive armazenamento bloqueado',async()=>{
  const source=await readFile(new URL('../src/theme.js',import.meta.url),'utf8');
  for(const [saved,expected]of [['dark','dark'],['light','light'],['<invalid>','light'],[null,'light']]){

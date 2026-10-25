@@ -2,7 +2,7 @@ import {mkdir,copyFile,writeFile,readdir,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
-export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','assets/cop-noc-header.png','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs','src/contact-actions.mjs','src/session-lifecycle.mjs','src/pwa.mjs','src/theme.js','src/region-maps.mjs','src/max-window.mjs','manifest.webmanifest','sw.js','offline.html','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable-512.png','assets/apple-touch-icon.png'];
+export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','assets/cop-noc-header.png','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs','src/contact-actions.mjs','src/session-lifecycle.mjs','src/pwa.mjs','src/theme.js','src/region-maps.mjs','manifest.webmanifest','sw.js','offline.html','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable-512.png','assets/apple-touch-icon.png'];
 export function publicConfig(env){
  const url=env.COP_SUPABASE_URL||'',key=env.COP_SUPABASE_ANON_KEY||'';
  if(env.VERCEL_ENV==='production'&&(!url||!key))throw Error('Publicação de produção exige URL e chave pública do backend; demonstração não pode ser publicada em produção.');

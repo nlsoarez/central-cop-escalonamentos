@@ -6,7 +6,6 @@ import {dialUrl,operationalNotes,shareContact,contactShareText} from './contact-
 import {createSessionRecovery} from './session-lifecycle.mjs';
 import {setupPwa} from './pwa.mjs';
 import {regionMap} from './region-maps.mjs';
-import {openMaxWindow} from './max-window.mjs';
 
 const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
@@ -54,7 +53,7 @@ function navButton(page,title,iconName){
   return '<button type="button" class="nav-link '+(state.view===page?'active':'')+'" '+(state.view===page?'aria-current="page"':'')+' data-action="nav" data-page="'+page+'">'+ic(iconName)+'<span>'+title+'</span></button>';
 }
 function topTitle(){
-  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',usuarios:'Gestão de usuários',nice:'Integração NICE MAX'})[state.view]||'Central COP';
+  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',usuarios:'Gestão de usuários'})[state.view]||'Central COP';
 }
 function uiHeader(){
  const stamp=state.contacts.map(c=>c.updated_at||'').filter(Boolean).sort().at(-1);
@@ -69,7 +68,7 @@ function themeButton(){
 }
 function renderShell(){
  const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+
- '<div class="nav-divider"></div>'+navButton('nice','NICE MAX','phone')+themeButton()+
+ '<div class="nav-divider"></div>'+themeButton()+
  (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'');
  return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+ic('bolt',27)+'</div><div><strong>Central COP</strong><small>OPERAÇÃO DE REDE</small></div></div><div class="nav-caption">NAVEGAÇÃO</div><nav aria-label="Menu principal">'+nav+'<button class="nav-link mobile-only" data-action="mobile-menu" aria-expanded="'+Boolean(state.mobileMenu)+'">'+ic('settings')+'<span>Mais</span></button></nav><div class="sidebar-foot">'+ic('info')+'<span>Ambiente interno<small>Central de Operações</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
  (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+themeButton()+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
@@ -124,7 +123,7 @@ function contactList(list){
 function rightPanel(){
  const fav=state.favorites.map(id=>state.contacts.find(c=>c.id===id)).filter(Boolean).slice(0,4);
  const recent=state.recent.slice(0,5);
- return '<aside class="side-panels"><section class="panel"><h3>'+ic('bolt')+' Acesso rápido</h3><div class="quick-grid"><button data-action="quick" data-mode="city">'+ic('map')+' Localidades</button><button data-action="quick" data-mode="topology">'+ic('layout')+' Topologias</button><button data-action="nav" data-page="diretorio">'+ic('users')+' Diretório</button><button data-action="nav" data-page="favoritos">'+ic('star')+' Favoritos</button></div></section><section class="panel"><h3>'+ic('star')+' Favoritos <button data-action="nav" data-page="favoritos">Ver todos</button></h3>'+(fav.length?fav.map(c=>'<div class="mini-row"><span class="mini-avatar">'+ic('users',16)+'</span><div><strong>'+h(c.full_name)+'</strong><small>'+h(c.cluster)+' · '+h(c.cidade||'Regional')+'</small></div><button data-action="jump" data-id="'+h(c.id)+'" title="Localizar">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Marque a estrela de um contato para acessá-lo rapidamente.</p>')+'</section><section class="panel"><h3>'+ic('clock')+' Recentes</h3>'+(recent.length?recent.map(item=>'<div class="mini-row"><span class="mini-avatar">'+ic('search',16)+'</span><div><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></div><button data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster||'')+'" title="Pesquisar novamente">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Suas pesquisas aparecerão aqui.</p>')+'</section><section class="panel tip"><h3>'+ic('info')+' NICE MAX</h3><p>Abra o MAX em uma janela compacta para acompanhar seus atendimentos. Confirme a ligação no discador.</p><button class="small-link" data-action="nav" data-page="nice">Abrir NICE MAX ↗</button></section></aside>';
+ return '<aside class="side-panels"><section class="panel"><h3>'+ic('bolt')+' Acesso rápido</h3><div class="quick-grid"><button data-action="quick" data-mode="city">'+ic('map')+' Localidades</button><button data-action="quick" data-mode="topology">'+ic('layout')+' Topologias</button><button data-action="nav" data-page="diretorio">'+ic('users')+' Diretório</button><button data-action="nav" data-page="favoritos">'+ic('star')+' Favoritos</button></div></section><section class="panel"><h3>'+ic('star')+' Favoritos <button data-action="nav" data-page="favoritos">Ver todos</button></h3>'+(fav.length?fav.map(c=>'<div class="mini-row"><span class="mini-avatar">'+ic('users',16)+'</span><div><strong>'+h(c.full_name)+'</strong><small>'+h(c.cluster)+' · '+h(c.cidade||'Regional')+'</small></div><button data-action="jump" data-id="'+h(c.id)+'" title="Localizar">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Marque a estrela de um contato para acessá-lo rapidamente.</p>')+'</section><section class="panel"><h3>'+ic('clock')+' Recentes</h3>'+(recent.length?recent.map(item=>'<div class="mini-row"><span class="mini-avatar">'+ic('search',16)+'</span><div><strong>'+h(item.label)+'</strong><small>'+h(item.time)+'</small></div><button data-action="recent" data-query="'+h(item.query)+'" data-cluster="'+h(item.cluster||'')+'" title="Pesquisar novamente">'+ic('chevron')+'</button></div>').join(''):'<p class="panel-hint">Suas pesquisas aparecerão aqui.</p>')+'</section></aside>';
 }
 function consultation(){
  const selected=Boolean(state.filters.cluster);
@@ -164,7 +163,6 @@ function importPage(){
  }
  return '<div class="standalone"><div class="panel import-intro"><h3>'+ic('upload')+' Importação segura</h3><p>Envie Excel (.xlsx / .xls) ou CSV. Aceita o modelo de escalonamento com blocos por nível, células mescladas e referência de cidades de MG. A leitura acontece neste navegador e só grava no banco após sua confirmação.</p><label class="file-pick">Selecionar planilha<input type="file" id="importFile" accept=".csv,.xlsx,.xls" '+(state.busy?'disabled':'')+'/></label><p class="panel-hint">Limites: 5 MB e 2.000 registros após distribuir as abrangências por cidade. Clusters são identificados por nome, nunca pela posição da aba.</p></div>'+preview+'<h3 class="subheading">Histórico de versões</h3>'+renderBatches()+'</div>';
 }
-function nicePage(){return '<section class="panel integration"><div class="integration-icon">'+ic('phone',35)+'</div><div><h3>NICE MAX</h3><p>Abra o discador em uma janela separada. Use a extensão Assistente COP para preparar o telefone e confirme a ligação no MAX.</p><button class="btn primary" data-action="nav" data-page="nice">Abrir NICE MAX ↗</button></div></section>';}
 function usersPage(){
  if(!userIsAdmin())return '<div class="empty">Acesso restrito.</div>';
  const validated=state.roster;
@@ -194,7 +192,7 @@ function initialSetupView(){
 function passwordChangeView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',34)+'</div><span class="overline">SENHA PESSOAL</span><h1>Altere sua senha</h1><p>Informe a senha atual e escolha uma nova senha pessoal. No primeiro acesso, esta troca é obrigatória.</p><form id="changePasswordForm"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
 }
-function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage,nice:nicePage})[state.view]?.()||consultation();}
+function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage})[state.view]?.()||consultation();}
 function renderModal(){
  const c=state.modal==='new'?{}:state.contacts.find(item=>item.id===state.modal)||{};
  const textInput=(name,label,val,required='')=>'<label class="field"><span>'+label+'</span><input name="'+name+'" value="'+h(val||'')+'" '+required+'/></label>';
@@ -403,7 +401,6 @@ root.addEventListener('click',async e=>{
  if(action==='mobile-menu'){state.mobileMenu=!state.mobileMenu;render();return;}
  if(action==='change-password'){state.credentials=[];state.view='senha';render();return;}
  if(action==='nav'){
-  if(btn.dataset.page==='nice'){if(!mobile())openMaxWindow();return;}
   state.mobileMenu=false;
   if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
     state.credentials=[];state.roster=null;state.rosterRaw='';

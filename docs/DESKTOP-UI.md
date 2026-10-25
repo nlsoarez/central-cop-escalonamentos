@@ -1,5 +1,7 @@
 # Desktop: continuidade, MAX e aparência
 
+> Atualização posterior em 25/10/2026: o usuário relatou que a janela compacta do MAX permanecia carregando. A abertura direta foi retirada do menu lateral e do painel auxiliar. O módulo exclusivo do popup e seu teste foram removidos. A extensão e os botões dos contatos permanecem preservados. A causa do carregamento dentro do MAX não foi confirmada. A descrição de popup abaixo é o registro histórico da versão anterior.
+
 Atualização de 25/10/2026.
 
 ## Comportamento
