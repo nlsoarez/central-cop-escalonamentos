@@ -12,3 +12,5 @@ Os derivados são redimensionamentos do original; não houve redesenho nem remo�
 Para regenerar, execute `node scripts/generate-pwa-icons.mjs` com Sharp disponível. A variável opcional `COP_SHARP_MODULE` aceita o caminho de uma instalação externa de Sharp; não é uma dependência da aplicação ou da publicação.
 
 Validação: 103 testes aprovados, sintaxe e build aprovados. Prévia local confirmou as imagens carregadas no menu e cabeçalho e as duas referências de favicon, sem overflow.
+
+Publicação: commit `0ef9022`, deployment `dpl_Ck3xpJfFFSnRjU2Axs99wB3C7KSk` READY, worker `cop-public-static-ff1316b63063e198`. Os seis PNGs foram verificados no endereço principal com HTTP 200 e hash SHA-1 idêntico ao arquivo local. A página publicada confirmou os dois favicons. Reversão disponível para o deployment anterior `dpl_Cizr6wz2uDmnunHJw6yoNh5BCiv5`.
