@@ -2,6 +2,8 @@
 
 > Atualização posterior em 25/10/2026: o usuário relatou que a janela compacta do MAX permanecia carregando. A abertura direta foi retirada do menu lateral e do painel auxiliar. O módulo exclusivo do popup e seu teste foram removidos. A extensão e os botões dos contatos permanecem preservados. A causa do carregamento dentro do MAX não foi confirmada. A descrição de popup abaixo é o registro histórico da versão anterior.
 
+Retirada publicada: código `84e91d6`, deployment `dpl_9wkPnSBTEddk68hTS1EpbEYwQTEx` READY, worker `cop-public-static-9f4e0b0aa0a51301`. Validação: 103 testes aprovados, sintaxe e build aprovados; módulo principal em produção confirmou ausência dos atalhos e preservação do botão dos contatos e do seletor de tema.
+
 Atualização de 25/10/2026.
 
 ## Comportamento
