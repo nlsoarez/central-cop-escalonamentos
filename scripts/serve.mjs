@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url)).replace(/[\\/]$/,'');
-const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png'};
+const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.png':'image/png','.webmanifest':'application/manifest+json'};
 http.createServer(async(req,res)=>{
  try{
   const path=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
@@ -14,7 +14,7 @@ http.createServer(async(req,res)=>{
   }
   const file=resolve(root,'.'+(path==='/'?'/index.html':path));
   if(!file.startsWith(root+'\\')&&!file.startsWith(root+'/'))throw Error('Invalid path');
-  if(!['/index.html','/config.example.js'].includes(path)&&path!=='/'&&!/^\/(src|assets)\//.test(path))throw Error('Not public');
+  if(!['/index.html','/config.example.js','/offline.html','/sw.js','/manifest.webmanifest'].includes(path)&&path!=='/'&&!/^\/(src|assets)\//.test(path))throw Error('Not public');
   const body=await readFile(file);
   res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream','Cache-Control':'no-store'});res.end(body);
  }catch{res.writeHead(404);res.end('Not found');}

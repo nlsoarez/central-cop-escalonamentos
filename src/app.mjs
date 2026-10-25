@@ -2,12 +2,16 @@ import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,filterContact
 import {parseWorkbook} from './workbook.mjs';
 import {store} from './store.mjs';
 import {parseRoster} from './users.mjs';
+import {dialUrl,operationalNotes,shareContact,contactShareText} from './contact-actions.mjs';
+import {createSessionRecovery} from './session-lifecycle.mjs';
+import {setupPwa} from './pwa.mjs';
 
 const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
 if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 const iconPaths={
+ share:'<path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8"/>',
  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
  layout:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M9 9h12"/>',
  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -34,6 +38,8 @@ const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&sta
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
 const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
+state.connection=navigator.onLine===false?'unavailable':'online';
+const mobile=()=>matchMedia('(max-width: 760px)').matches;
 const toast=(message,kind='info')=>{
  state.notice={message,kind};
  root.querySelectorAll('.toast').forEach(el=>el.remove());
@@ -57,7 +63,8 @@ function renderShell(){
  const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+
  '<div class="nav-divider"></div>'+navButton('nice','NICE MAX','phone')+
  (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'');
- return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+ic('bolt',27)+'</div><div><strong>Central COP</strong><small>OPERAÇÃO DE REDE</small></div></div><div class="nav-caption">NAVEGAÇÃO</div><nav aria-label="Menu principal">'+nav+'</nav><div class="sidebar-foot">'+ic('info')+'<span>Ambiente interno<small>Central de Operações</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
+ return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+ic('bolt',27)+'</div><div><strong>Central COP</strong><small>OPERAÇÃO DE REDE</small></div></div><div class="nav-caption">NAVEGAÇÃO</div><nav aria-label="Menu principal">'+nav+'<button class="nav-link mobile-only" data-action="mobile-menu" aria-expanded="'+Boolean(state.mobileMenu)+'">'+ic('settings')+'<span>Mais</span></button></nav><div class="sidebar-foot">'+ic('info')+'<span>Ambiente interno<small>Central de Operações</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
+ (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
  (state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'')+(state.modal?renderModal():'');
 }
 function clusterBar(){
@@ -84,12 +91,23 @@ function filterUI(){
 }
 function contactCard(c){
  const validNumber=normalizePhone(c.phone_e164||c.phone_display||'');
- const url=whatsappUrl(c),isFav=state.favorites.includes(c.id);
- const phone=(!store.demo&&validNumber.valid)
- ? '<a class="phone-link" href="'+url+'" target="_blank" rel="noopener noreferrer" data-contact="'+h(c.id)+'">'+ic('phone',16)+' '+h(validNumber.display)+'</a>'
- : '<span class="phone-disabled" title="'+(store.demo?'Demonstração: chamadas desativadas':'Telefone inválido')+'">'+ic('phone',16)+' '+h(c.phone_display||'Sem telefone válido')+'</span>';
- const isValid=isCurrentValidity(c);
- return '<article class="contact-card"><div class="level-block level-'+h(String(c.nivel||'other').match(/\d/)?.[0]||'other')+'"><strong>'+(c.nivel?'Nível '+h(c.nivel):'Sem nível')+'</strong><small>'+h(c.scope==='regional'?'Contato regional':'Contato local')+'</small></div><div class="contact-person"><div class="person-avatar">'+ic('users',22)+'</div><div class="person-details"><h3>'+h(c.full_name)+'</h3><div class="role">'+h(c.cargo||'Cargo não informado')+'</div><div class="dim">Área: '+h(c.area||'Toda a regional')+' · '+h(c.cluster)+(c.cidade?' · '+h(c.cidade):'')+'</div><div class="tags"><span class="tag">'+h(c.topologia||'Todas as topologias')+'</span>'+(c.scope==='regional'?'<span class="tag blue">Abrangência regional</span>':'')+(!isValid?'<span class="tag warn">Fora da vigência informada</span>':'')+(c.active===false?'<span class="tag warn">Inativo</span>':'')+'</div></div></div><div class="contact-meta">'+phone+(c.notes?'<div class="notes">'+ic('info',14)+' '+h(c.notes)+'</div>':'')+'</div><div class="contact-actions"><button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',18)+'</button><button class="btn whatsapp" '+(store.demo||!url?'disabled title="Indisponível em demonstração ou com número inválido"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',15)+' WhatsApp</button><button class="btn subtle" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button><button class="btn max" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+(userIsAdmin()?'<button class="icon-btn" data-action="edit" data-id="'+h(c.id)+'" title="Editar contato">'+ic('edit')+'</button>':'')+'</div></article>';
+ const url=whatsappUrl(c),dial=dialUrl(c),isFav=state.favorites.includes(c.id);
+ const enabled=!store.demo&&validNumber.valid;
+ const phone=enabled
+  ? '<a class="phone-link desktop-only" href="'+url+'" target="_blank" rel="noopener noreferrer" data-contact="'+h(c.id)+'">'+ic('phone',16)+' '+h(validNumber.display)+'</a><a class="phone-dial mobile-only" href="'+dial+'" aria-label="Ligar para '+h(c.full_name)+'">'+ic('phone',18)+' '+h(validNumber.display)+'</a>'
+  : '<span class="phone-disabled" title="'+(store.demo?'Demonstração: chamadas desativadas':'Telefone inválido')+'">'+ic('phone',16)+' '+h(c.phone_display||'Sem telefone válido')+'</span>';
+ const valid=isCurrentValidity(c),notes=operationalNotes(c.notes);
+ const place=[c.cluster,c.area,c.cidade].filter(Boolean).join(' · ');
+ return '<article class="contact-card"><div class="level-block level-'+h(String(c.nivel||'other').match(/\d/)?.[0]||'other')+'"><strong>'+(c.nivel?'Nível '+h(c.nivel):'Sem nível')+'</strong></div>'+
+  '<div class="contact-person"><div class="person-avatar">'+ic('users',22)+'</div><div class="person-details"><h3>'+h(c.full_name)+'</h3>'+(c.cargo?'<div class="role">'+h(c.cargo)+'</div>':'')+(place?'<div class="dim">'+h(place)+'</div>':'')+'<div class="tags">'+(c.topologia?'<span class="tag">'+h(c.topologia)+'</span>':'')+(!valid?'<span class="tag warn">Fora da vigência informada</span>':'')+(c.active===false?'<span class="tag warn">Inativo</span>':'')+'</div></div></div>'+
+  '<div class="contact-meta">'+phone+(notes?'<div class="notes">'+ic('info',14)+' '+h(notes)+'</div>':'')+'</div>'+
+  '<div class="contact-actions">'+(enabled?'<a class="btn primary dial-action mobile-only" href="'+dial+'">'+ic('phone',17)+' Ligar</a>':'<button class="btn primary dial-action mobile-only" disabled>'+ic('phone',17)+' Ligar</button>')+
+  '<button class="btn whatsapp" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
+  '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo?'disabled':'')+'>'+ic('share',17)+' '+(typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
+  '<button class="btn subtle desktop-only" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button>'+
+  '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+
+  '<button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" aria-pressed="'+isFav+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',19)+'</button>'+
+  (userIsAdmin()?'<button class="icon-btn edit-contact" data-action="edit" data-id="'+h(c.id)+'" title="Editar contato">'+ic('edit')+'</button>':'')+'</div></article>';
 }
 function contactList(list){
  if(!list.length)return '<div class="empty"><div class="empty-icon">'+ic('search',32)+'</div><h3>Nenhum contato encontrado</h3><p>Revise os filtros ou confirme se há contatos cadastrados nessa região.</p><button class="btn subtle" data-action="clear">Limpar filtros</button></div>';
@@ -179,31 +197,68 @@ function loginView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',36)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>Matrícula ou e-mail de administrador<input type="text" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
 }
 function clearPrivateState(){
+ try{if(state.user?.id)sessionStorage.removeItem('cop-consultation:'+state.user.id);}catch{}
  state.sessionEpoch=(state.sessionEpoch||0)+1;
  state.pendingRoster=[];state.user=null;state.contacts=[];state.accounts=[];state.batches=[];state.audit=[];state.upload=null;
  state.credentials=[];state.roster=null;state.rosterRaw='';state.modal=null;state.view='consultar';
  state.recent=[];state.favorites=[];
+ state.filters={cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''};state.mobileMenu=false;
+ state.contactDraft=null;
 }
 const authNotice=()=>state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'';
+function rememberConsultation(){
+ if(!state.user?.active)return;
+ try{sessionStorage.setItem('cop-consultation:'+state.user.id,JSON.stringify({view:['consultar','diretorio','favoritos','recentes'].includes(state.view)?state.view:'consultar',filters:state.filters}));}catch{}
+}
+function captureDraft(){
+ const query=document.querySelector('#mainSearch,#directorySearch');if(query)state.filters.query=query.value;
+ const roster=document.querySelector('#rosterText');if(roster)state.rosterRaw=roster.value;
+ const form=document.querySelector('#contactForm');
+ if(form&&userIsAdmin())state.contactDraft={id:state.modal,fields:Array.from(form.elements).filter(el=>el.name&&el.type!=='password').map(el=>({name:el.name,value:el.value,checked:el.checked,type:el.type}))};
+}
+function restoreDraft(){
+ if(!state.modal){state.contactDraft=null;return;}
+ const draft=state.contactDraft,form=document.querySelector('#contactForm');
+ if(!form||!userIsAdmin()||draft?.id!==state.modal)return;
+ for(const item of draft.fields){const field=form.elements.namedItem(item.name);if(field){if(item.type==='checkbox')field.checked=item.checked;else field.value=item.value;}}
+}
+function restoreConsultation(){
+ try{
+  const saved=JSON.parse(sessionStorage.getItem('cop-consultation:'+state.user.id)||'null');
+  if(!saved||!['consultar','diretorio','favoritos','recentes'].includes(saved.view))return;
+  state.view=saved.view;
+  for(const key of Object.keys(state.filters))if(typeof saved.filters?.[key]==='string')state.filters[key]=saved.filters[key].slice(0,300);
+  if(!CLUSTERS.includes(state.filters.cluster))state.filters.cluster='';
+ }catch{}
+}
+function connectionView(){return '<div class="auth-screen"><section class="auth-card connection-card" role="status"><div class="auth-logo">'+ic('refresh',32)+'</div><span class="overline">CENTRAL COP</span><h1>'+(state.connection==='checking'?'Validando acesso…':'Consulta indisponível')+'</h1><p>'+(state.connection==='checking'?'Aguarde enquanto recuperamos sua sessão e verificamos os dados atuais.':'Não foi possível confirmar a conexão e validar sua sessão. Os contatos ficam ocultos até a reconexão; sua consulta será recuperada se a sessão continuar válida.')+'</p><button class="btn primary" data-action="retry-session">Tentar novamente</button></section></div>';}
 function render(){
+ if(mobile()&&state.view==='nice')state.view='consultar';
+ rememberConsultation();
  if(store.configurationError){root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>Serviço indisponível</h1><p>'+h(store.configurationError)+'</p></div></div>';return;}
+ if(state.connection!=='online'){root.innerHTML=connectionView();return;}
  if(state.setupToken){root.innerHTML=initialSetupView()+authNotice();return;}
  if(state.loading){root.innerHTML='<div class="loading">'+ic('refresh',34)+' Carregando Central COP...</div>';return;}
  if(store.configured && state.user?.active && (state.user.must_change_password||state.view==='senha')){root.innerHTML=passwordChangeView()+authNotice();return;}
  if(store.configured && !state.user?.active){root.innerHTML=state.user?.role==='pending'?'<div class="auth-screen"><div class="auth-card"><h2>Acesso pendente</h2><p>Seu usuário ainda não foi liberado. Procure o administrador.</p><button class="btn primary" data-action="logout">Sair</button></div></div>':loginView();root.insertAdjacentHTML('beforeend',authNotice());return;}
  root.innerHTML=renderShell();
+ restoreDraft();
 }
 async function refresh(){
- state.contacts=await store.contacts();
+ const epoch=state.sessionEpoch||0,id=state.user?.id;
+ const contacts=await store.contacts();
+ let metadata;
  if(userIsAdmin()){
-   const [batches,accounts,audit,pending]=await Promise.all([store.batches(),store.users(),store.userAudit(),store.pendingRoster()]);
-   state.batches=batches;state.accounts=accounts;state.audit=audit;state.pendingRoster=pending;
+   metadata=await Promise.all([store.batches(),store.users(),store.userAudit(),store.pendingRoster()]);
  }
+ if(epoch!==(state.sessionEpoch||0)||id!==state.user?.id)return;
+ state.contacts=contacts;
+ if(metadata)[state.batches,state.accounts,state.audit,state.pendingRoster]=metadata;
  render();
 }
 async function init(){
- try{state.user=await store.session();loadPreferences();if(store.demo||(state.user?.active&&!state.user.must_change_password))await refresh();}
- catch(e){state.notice={message:'Falha ao carregar dados: '+e.message,kind:'error'};}
+ try{if(navigator.onLine===false)throw Error('offline');state.user=await store.session();loadPreferences();if(state.user?.active)restoreConsultation();if(store.demo||(state.user?.active&&!state.user.must_change_password))await refresh();}
+ catch{state.connection='unavailable';}
  finally{state.loading=false;render();}
 }
 const preferenceKey=key=>key+':'+(state.user?.id||'demo');
@@ -329,8 +384,13 @@ root.addEventListener('click',async e=>{
  }
  const action=btn.dataset.action;
  if(!action)return;
+ if(action==='retry-session'){await recoverSession({reload:true});return;}
+ if(state.connection!=='online')return;
+ if(action==='mobile-menu'){state.mobileMenu=!state.mobileMenu;render();return;}
  if(action==='change-password'){state.credentials=[];state.view='senha';render();return;}
  if(action==='nav'){
+  if(btn.dataset.page==='nice'&&mobile())return;
+  state.mobileMenu=false;
   if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
     state.credentials=[];state.roster=null;state.rosterRaw='';
   }
@@ -407,14 +467,21 @@ root.addEventListener('click',async e=>{
  if(action==='recent'){state.filters={query:btn.dataset.query||'',cluster:btn.dataset.cluster||'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};state.view='consultar';render();return;}
  if(action==='jump'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c){state.filters={cluster:c.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:c.full_name};state.view='consultar';render();}return;}
  if(action==='copy'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c)return;try{await copyText(c.phone_display||c.phone_e164||'');toast('Telefone copiado.','success');}catch{toast('Cópia não permitida neste navegador.','error');}return;}
+ if(action==='share'||action==='share-copy'){
+  const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c||store.demo)return;
+  try{
+   if(action==='share-copy'){await copyText(contactShareText(c));toast('Informações copiadas.','success');return;}
+   const result=await shareContact(c,{copy:copyText});if(result.kind==='copied')toast('Informações copiadas.','success');
+  }catch(error){btn.dataset.action='share-copy';btn.textContent='Copiar informações';toast(error.message,'error');}
+  return;
+ }
  if(action==='whatsapp'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c&&!store.demo&&whatsappUrl(c))window.open(whatsappUrl(c),'_blank','noopener,noreferrer');return;}
  if(action==='new'||action==='edit'){if(!userIsAdmin())return;state.modal=action==='new'?'new':btn.dataset.id;render();return;}
  if(action==='close-modal'){if(e.target!==btn&&e.target.classList.contains('modal-card'))return;state.modal=null;render();return;}
  if(action==='logout'){
-  try{await store.signOut();}finally{
-   clearPrivateState();
-   render();
-  }return;
+  state.signingOut=true;
+  clearPrivateState();state.connection='online';render();
+  try{await store.signOut();}catch{toast('Saída local concluída. A revogação no servidor depende da conexão.','error');}finally{state.signingOut=false;}return;
  }
  if(action==='publish'){
   if(!userIsAdmin()||!state.upload||state.busy)return;
@@ -434,22 +501,35 @@ root.addEventListener('click',async e=>{
   catch(err){toast('Falha na restauração: '+err.message,'error');}finally{state.busy=false;}return;
  }
 });
+const recoverSession=createSessionRecovery({
+ session:()=>state.signingOut?Promise.resolve(null):store.demo?Promise.resolve({id:'demo',role:'viewer',active:true}):store.session(),
+ epoch:()=>state.sessionEpoch||0,
+ online:()=>navigator.onLine!==false,
+ checking:()=>{captureDraft();state.connection='checking';render();},
+ unavailable:()=>{captureDraft();state.connection='unavailable';state.loading=false;render();},
+ signedOut:async user=>{clearPrivateState();state.user=user;state.connection='online';state.loading=false;render();},
+ verified:async(user,{reload})=>{
+  const changed=state.user?.id!==user.id,roleChanged=state.user?.role!==user.role;
+  const needsData=reload||changed||roleChanged||state.connection!=='online';
+  if(roleChanged&&state.user){state.contacts=[];state.accounts=[];state.pendingRoster=[];state.credentials=[];state.upload=null;state.modal=null;state.batches=[];state.audit=[];state.view='consultar';}
+  if(!store.demo)state.user=user;
+  if(changed){loadPreferences();if(!store.demo)restoreConsultation();}
+  if(needsData)await refresh();
+  state.connection=document.visibilityState==='hidden'?'checking':'online';state.loading=false;if(needsData)render();
+ }
+});
 init();
+setupPwa({canUpdate:()=>!state.busy&&!state.modal&&!state.upload,notify:message=>toast(message)});
 window.addEventListener('hashchange',()=>{
  const token=new URLSearchParams(location.hash.slice(1)).get('setup');
  if(token){state.setupToken=token;history.replaceState(null,'',location.pathname+location.search);render();}
 });
-if(store.configured&&!store.configurationError){
- let checking=false;
- setInterval(async()=>{
-  if(checking||state.busy||!state.user)return;
-  checking=true;
-  try{
-   const user=await store.session();
-   if(!user?.active||user.must_change_password){clearPrivateState();state.user=user;render();}
-   else if(user.role!==state.user.role){clearPrivateState();state.user=user;await refresh();}
-   else state.user=user;
-  }catch{clearPrivateState();render();}
-  finally{checking=false;}
- },30000);
-}
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='hidden'){captureDraft();rememberConsultation();state.connection='checking';render();}
+ else if(!store.configurationError)recoverSession({reload:true});
+});
+window.addEventListener('pageshow',event=>{if(event.persisted)recoverSession({reload:true});});
+window.addEventListener('offline',()=>{captureDraft();state.connection='unavailable';render();});
+window.addEventListener('online',()=>recoverSession({reload:true}));
+matchMedia('(max-width: 760px)').addEventListener('change',()=>{state.mobileMenu=false;render();});
+setInterval(()=>{if(!state.busy&&state.user&&document.visibilityState!=='hidden')recoverSession({quiet:true});},30000);

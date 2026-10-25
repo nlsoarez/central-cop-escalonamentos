@@ -11,6 +11,8 @@ test('build publica somente a interface e configuração pública',async()=>{
   const files=await readdir(output,{recursive:true});
   assert.deepEqual(files.filter(p=>p.includes('.')).map(p=>p.replaceAll('\\','/')).sort(),[...PUBLIC_FILES,'config.js'].sort());
   assert.ok(!(await readFile(join(output,'config.js'),'utf8')).includes('service_role'));
+  const worker=await readFile(join(output,'sw.js'),'utf8');
+  assert.doesNotMatch(worker,/__COP_BUILD__/);assert.match(worker,/cop-public-static-[a-f0-9]{16}/);
   await writeFile(join(output,'private.csv'),'synthetic');
   await assert.rejects(build(output,{}),/não autorizados/);
  }finally{await rm(output,{recursive:true,force:true});}

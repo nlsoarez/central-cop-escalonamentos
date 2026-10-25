@@ -2,6 +2,8 @@
 
 Portal independente para consulta operacional de contatos e níveis de escalonamento do COP Rede.
 
+A evolução mobile inclui PWA instalável conforme suporte do navegador, recuperação de sessão após suspensão, discador, WhatsApp e compartilhamento de contatos. Veja [implementação e roteiro Android/iPhone](docs/MOBILE-PWA.md). Dados operacionais não ficam disponíveis offline.
+
 > **Projeto novo**: não compartilha banco, autenticação, repositório ou credenciais com o SIM.
 
 ## O que a V1 oferece

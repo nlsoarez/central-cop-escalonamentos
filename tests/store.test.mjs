@@ -29,3 +29,31 @@ test('falha de rede após senha aceita é identificada como validação de sess�
  })});
  await assert.rejects(store.signIn('F9900001','synthetic'),error=>error.stage==='session'&&error.message.includes('senha foi aceita'));
 });
+test('recupera e renova sessão pelo SDK antes de validar usuário e backend',async()=>{
+ const order=[];
+ const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:(_u,_k,options)=>{
+  assert.equal(options.auth.persistSession,true);assert.equal(options.auth.autoRefreshToken,true);
+  return {auth:{getSession:async()=>{order.push('recover-refresh');return {data:{session:{}}};},getUser:async()=>{order.push('verify-user');return {data:{user:{id:'synthetic'}}};}},rpc:async()=>{order.push('verify-session');return {data:true};},from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:'synthetic',active:true,role:'viewer'}})})})})};
+ }});
+ assert.equal((await store.session()).active,true);assert.deepEqual(order,['recover-refresh','verify-user','verify-session']);
+});
+test('falhas temporárias do Auth ou RPC não executam logout',async()=>{
+ for(const point of ['recover','user','rpc']){
+  let logouts=0;
+  const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:()=>({auth:{getSession:async()=>point==='recover'?{error:{status:503}}:{data:{session:{}}},getUser:async()=>point==='user'?{error:{status:503,name:'AuthRetryableFetchError'}}:{data:{user:{id:'synthetic'}}},signOut:async()=>{logouts++;}},rpc:async()=>({error:Error('temporary outage')})})});
+  await assert.rejects(store.session());assert.equal(logouts,0);
+ }
+});
+test('sessão ausente ou refresh inválido não vira sessão autorizada',async()=>{
+ for(const result of [{data:{session:null}},{error:{status:400,code:'refresh_token_not_found'}}]){
+  const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:()=>({auth:{getSession:async()=>result,getUser:async()=>{throw Error('must not authorize');}}})});
+  assert.equal(await store.session(),null);
+ }
+});
+test('logout manual limpa somente a sessão deste backend mesmo sem conexão',async()=>{
+ const removed=[];
+ const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:()=>({auth:{signOut:async()=>({error:Error('offline')})}})});
+ window.localStorage={removeItem:key=>removed.push(key)};
+ await assert.rejects(store.signOut());
+ assert.deepEqual(removed,['sb-example-auth-token','sb-example-auth-token-code-verifier','sb-example-auth-token-user']);
+});

@@ -10,6 +10,8 @@ test('CSP limita execução e destinos sem permitir handlers inline ou frames',a
  assert.deepEqual(policy['frame-ancestors'],["'none'"]);
  assert.deepEqual(policy['base-uri'],["'none'"]);
  assert.deepEqual(policy['object-src'],["'none'"]);
+ assert.deepEqual(policy['worker-src'],["'self'"]);
+ assert.deepEqual(policy['manifest-src'],["'self'"]);
  assert.ok(!policy['script-src'].some(s=>['*',"'unsafe-inline'","'unsafe-eval'",'https:','data:'].includes(s)));
  assert.deepEqual(policy['connect-src'],["'self'",'https://api-central-cop.179-198-124-8.sslip.io']);
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');

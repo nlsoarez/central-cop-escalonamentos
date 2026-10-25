@@ -1,7 +1,8 @@
-import {mkdir,copyFile,writeFile,readdir} from 'node:fs/promises';
+import {mkdir,copyFile,writeFile,readdir,readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
-export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','assets/cop-noc-header.png','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs'];
+export const PUBLIC_FILES=['index.html','config.example.js','assets/styles.css','assets/cop-noc-header.png','src/app.mjs','src/core.mjs','src/workbook.mjs','src/store.mjs','src/users.mjs','src/contact-actions.mjs','src/session-lifecycle.mjs','src/pwa.mjs','manifest.webmanifest','sw.js','offline.html','assets/icon-192.png','assets/icon-512.png','assets/icon-maskable-512.png','assets/apple-touch-icon.png'];
 export function publicConfig(env){
  const url=env.COP_SUPABASE_URL||'',key=env.COP_SUPABASE_ANON_KEY||'';
  if(env.VERCEL_ENV==='production'&&(!url||!key))throw Error('Publicação de produção exige URL e chave pública do backend; demonstração não pode ser publicada em produção.');
@@ -26,6 +27,10 @@ export async function build(output,env=process.env){
   const target=resolve(output,name);await mkdir(resolve(target,'..'),{recursive:true});
   await copyFile(resolve(root,name),target);
  }
+ const revision=createHash('sha256');
+ for(const name of PUBLIC_FILES){revision.update(name);revision.update(await readFile(resolve(root,name)));}
+ const worker=await readFile(resolve(root,'sw.js'),'utf8');
+ await writeFile(resolve(output,'sw.js'),worker.replaceAll('__COP_BUILD__',revision.digest('hex').slice(0,16)));
  await writeFile(resolve(output,'config.js'),'window.CENTRAL_COP_CONFIG = '+JSON.stringify(config)+';\n');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

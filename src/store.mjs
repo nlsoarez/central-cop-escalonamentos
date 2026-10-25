@@ -14,6 +14,8 @@ const DEMO_CONTACTS = [
 ].map(c=>({...c,updated_at:'',valid_from:null,valid_until:null}));
 const setting=window.CENTRAL_COP_CONFIG || {};
 const configured=Boolean(setting.supabaseUrl && setting.supabaseAnonKey);
+// Same storage-key convention as SupabaseClient, preserving existing sessions.
+const authStorageKey=configured?'sb-'+new URL(setting.supabaseUrl).hostname.split('.')[0]+'-auth-token':'';
 const client=(configured && window.supabase?.createClient)
   ? window.supabase.createClient(setting.supabaseUrl,setting.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true}})
   : null;
@@ -23,6 +25,8 @@ const configurationError = configured && !client
   : Boolean(setting.supabaseUrl) !== Boolean(setting.supabaseAnonKey)
     ? 'Configuração incompleta da autenticação. Contate o administrador.' : '';
 const expect = ({data,error}) => {if(error)throw error;return data;};
+const unavailable = () => Object.assign(Error('Não foi possível validar sua sessão agora. Reconecte para tentar novamente.'),{transient:true});
+const terminalAuthError = error => [400,401,403].includes(error?.status) && error?.name !== 'AuthRetryableFetchError';
 export const store={
   configured:configured || Boolean(configurationError),
   configurationError,
@@ -30,8 +34,20 @@ export const store={
   demoContacts:DEMO_CONTACTS.map(c=>({...c})),
   async session(){
     if(!client)return null;
-    const {data,error}=await client.auth.getUser();if(error||!data.user)return null;
-    const valid=expect(await client.rpc('cop_session_valid'));
+    // getSession recovers persisted state and lets the SDK refresh expired access
+    // tokens under its own lock. It is never used as authorization evidence.
+    if(client.auth.getSession){
+      const restored=await client.auth.getSession();
+      if(restored.error){if(terminalAuthError(restored.error))return null;throw unavailable();}
+      if(!restored.data?.session)return null;
+    }
+    const {data,error}=await client.auth.getUser();
+    if(error){if(terminalAuthError(error)){await client.auth.signOut({scope:'local'});return null;}throw unavailable();}
+    if(!data?.user)return null;
+    const validation=await client.rpc('cop_session_valid');
+    if(validation.error)throw unavailable();
+    const valid=validation.data;
+    if(typeof valid!=='boolean')throw unavailable();
     if(!valid){await client.auth.signOut({scope:'local'});return null;}
     const profile=expect(await client.from('cop_profiles').select('id,login_id,display_name,role,active,must_change_password').eq('id',data.user.id).maybeSingle());
     if(!profile?.active) return {id:data.user.id,email:data.user.email,role:'pending',display_name:data.user.email,active:false};
@@ -97,7 +113,16 @@ export const store={
   async setUserActive(userId,active){
     return this.invoke('cop-manage-users',{action:'set_active',userId,active});
   },
-  async signOut(){if(client)expect(await client.auth.signOut());},
+  async signOut(){
+    if(!client)return;
+    try{expect(await client.auth.signOut());}
+    finally{
+      // Explicit logout is different from transport failure during validation:
+      // discard this application's stored session even when the logout request
+      // cannot reach the server. Never clear unrelated browser storage.
+      try{for(const key of [authStorageKey,authStorageKey+'-code-verifier',authStorageKey+'-user'])window.localStorage?.removeItem(key);}catch{}
+    }
+  },
   async contacts(){
     if(!client)return DEMO_CONTACTS.map(c=>({...c}));
     const rows=[];
