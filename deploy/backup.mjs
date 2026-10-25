@@ -5,7 +5,10 @@ import {pipeline} from 'node:stream/promises';
 import {resolve} from 'node:path';
 export async function encrypt(input,output,key){
  const nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,nonce);
- const file=fs.createWriteStream(output,{flags:'wx',mode:0o600});
+ // Acquire ownership before entering cleanup: EEXIST must never delete a
+ // previously successful backup belonging to another invocation.
+ const descriptor=fs.openSync(output,'wx',0o600);
+ const file=fs.createWriteStream(output,{fd:descriptor,autoClose:true});
  file.write(Buffer.concat([Buffer.from('CCB1'),nonce]));
  try{await pipeline(input,cipher,file,{end:false});file.end(cipher.getAuthTag());await new Promise((r,j)=>{file.on('finish',r);file.on('error',j);});}
  catch(error){file.destroy();fs.rmSync(output,{force:true});throw error;}
@@ -16,7 +19,8 @@ export async function decrypt(inputPath,output,key){
  fs.readSync(handle,header,0,16,0);fs.readSync(handle,tag,0,16,size-16);fs.closeSync(handle);
  if(header.subarray(0,4).toString()!=='CCB1')throw Error('Invalid backup');
  const decipher=createDecipheriv('aes-256-gcm',key,header.subarray(4));decipher.setAuthTag(tag);
- try{await pipeline(fs.createReadStream(inputPath,{start:16,end:size-17}),decipher,fs.createWriteStream(output,{flags:'wx',mode:0o600}));}
+ const descriptor=fs.openSync(output,'wx',0o600);
+ try{await pipeline(fs.createReadStream(inputPath,{start:16,end:size-17}),decipher,fs.createWriteStream(output,{fd:descriptor,autoClose:true}));}
  catch(error){fs.rmSync(output,{force:true});throw error;}
 }
 if(process.argv[2]){

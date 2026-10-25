@@ -55,6 +55,22 @@ test('migrações, RLS, sessões e importações em PostgreSQL isolado',async t=
   await assert.rejects(publish([contact('RJ')]),/Sem permissão/);
   assert.equal((await db.query('select * from public.cop_user_audit')).rows.length,0);
  });
+ await t.test('viewer não altera contatos, lê lista privada ou executa RPC privilegiada',async()=>{
+  await as('authenticated',viewer,viewerSession);
+  assert.equal((await db.query('select * from public.cop_pending_roster')).rows.length,0);
+  assert.equal((await db.query('select * from public.cop_import_batches')).rows.length,0);
+  assert.equal((await db.query('select * from public.cop_contact_audit')).rows.length,0);
+  assert.equal((await db.query("update public.cop_contacts set notes='unauthorized' returning id")).rows.length,0);
+  assert.equal((await db.query('delete from public.cop_contacts returning id')).rows.length,0);
+  await assert.rejects(db.query("insert into public.cop_contacts(cluster,full_name,phone_e164) values('RJ','Unauthorized','5521999990001')"),/row-level security/);
+  await assert.rejects(db.query('select public.cop_revoke_sessions($1)',[admin]),/permission denied/);
+  await assert.rejects(db.query('select public.cop_consume_initial_setup($1)',['0'.repeat(64)]),/permission denied/);
+  await assert.rejects(db.query('select public.cop_acquire_account_lock($1)',[admin]),/permission denied/);
+  await as('anon',null,null);
+  for(const table of ['cop_profiles','cop_pending_roster','cop_user_audit','cop_import_batches','cop_contact_audit','cop_initial_setup','cop_request_limits','cop_account_locks']){
+   await assert.rejects(db.query('select * from public.'+table),/permission denied/);
+  }
+ });
  await t.test('troca obrigatória e suspensão são aplicadas pelo banco',async()=>{
   await root();await db.query('update public.cop_profiles set must_change_password=true where id=$1',[viewer]);
   await as('authenticated',viewer,viewerSession);

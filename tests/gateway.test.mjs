@@ -42,3 +42,25 @@ test('gateway aplica chaves, CORS, fluxo de senha e limites via HTTP',async t=>{
  assert.equal((await request('/functions/v1/arbitrary-worker',{method:'POST'})).status,404);
  assert.equal((await request('/rest/v1/cop_contacts')).status,200);
 });
+test('gateway não permite que a rota REST troque o servidor de destino',async t=>{
+ let unexpected=0;
+ const attacker=http.createServer((req,res)=>{unexpected++;res.end('unexpected');});
+ const upstream=http.createServer((req,res)=>res.end('expected'));
+ await new Promise(r=>attacker.listen(0,'127.0.0.1',r));
+ await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
+ const address='http://127.0.0.1:'+upstream.address().port;
+ const gateway=createGateway({anonKey:'anon-test',serviceKey:'service-test',origins:['https://allowed.invalid'],upstreams:{auth:address,rest:address,functions:address}});
+ await new Promise(r=>gateway.listen(0,'127.0.0.1',r));
+ t.after(()=>{for(const server of [attacker,upstream,gateway]){server.closeAllConnections();server.close();}});
+ const base='http://127.0.0.1:'+gateway.address().port;
+ const rawRequest=path=>new Promise((resolve,reject)=>{
+  const req=http.request(base,{path,headers:{apikey:'anon-test'}},res=>{res.resume();res.on('end',()=>resolve(res.statusCode));});
+  req.on('error',reject);req.end();
+ });
+ for(const path of ['http://[','//other.invalid/rest/v1/cop_contacts','/rest/v1/\\other.invalid/probe']) assert.equal(await rawRequest(path),400);
+ const response=await fetch(base+'/rest/v1//127.0.0.1:'+attacker.address().port+'/probe',{headers:{apikey:'anon-test',authorization:'Bearer synthetic-not-a-credential'}});
+ assert.equal(response.status,400);
+ assert.equal(unexpected,0,'rota controlada pelo cliente não pode alcançar outro servidor');
+ const legitimate=await fetch(base+'/rest/v1/cop_contacts?select=id',{headers:{apikey:'anon-test'}});
+ assert.equal(await legitimate.text(),'expected');
+});

@@ -31,21 +31,36 @@ export function createGateway({anonKey,serviceKey,origins,trustProxy=false,limit
   const reply=(status,data)=>{res.writeHead(status,{...cors,'Content-Type':'application/json'});res.end(JSON.stringify(data));};
   if(origin&&!origins.includes(origin)){reply(403,{error:'Origem não autorizada'});return;}
   if(req.method==='OPTIONS'){res.writeHead(204,cors);res.end();return;}
-  const url=new URL(req.url,'http://gateway');
+  // This is an origin server, never an open forward proxy. Malformed request
+  // targets must produce 400 rather than reject the async handler/process.
+  let url;
+  try{
+   if(!req.url?.startsWith('/')||req.url.startsWith('//')||req.url.includes('\\'))throw Error('Invalid target');
+   url=new URL(req.url,'http://gateway');
+  }catch{reply(400,{error:'Solicitação inválida'});return;}
   if(url.pathname==='/health'&&req.method==='GET'){reply(200,{status:'ok'});return;}
   const key=req.headers.apikey;
   if(!equal(key,anonKey)&&!equal(key,serviceKey)){reply(401,{error:'Chave de aplicação inválida'});return;}
   const service=equal(key,serviceKey);
   let destination;
+  const route=(path,base,search='')=>{
+   if(!path.startsWith('/')||path.startsWith('//')||path.includes('\\'))throw Error('Invalid route');
+   const target=new URL(base);
+   // Assign the pathname as data: new URL('//host', base) changes authority.
+   target.pathname=path;target.search=search;target.hash='';
+   return target;
+  };
+  try{
   if(url.pathname.startsWith('/auth/v1/')){
    const path=url.pathname.slice('/auth/v1'.length);
    // Cadastro, recovery e alterações de e-mail ficam fora da API pública.
    if(!service&&!['/token','/user','/logout','/settings','/health'].includes(path)){reply(404,{error:'Não encontrado'});return;}
    if(!service&&path==='/user'&&req.method!=='GET'){reply(403,{error:'Use o fluxo de troca de senha do portal'});return;}
-   destination=new URL(path+url.search,upstreams.auth);
-  }else if(url.pathname.startsWith('/rest/v1/'))destination=new URL(url.pathname.slice('/rest/v1'.length)+url.search,upstreams.rest);
-  else if(/^\/functions\/v1\/(cop-manage-users|cop-change-password|cop-initial-setup)$/.test(url.pathname))destination=new URL(url.pathname.slice('/functions/v1'.length),upstreams.functions);
+   destination=route(path,upstreams.auth,url.search);
+  }else if(url.pathname.startsWith('/rest/v1/'))destination=route(url.pathname.slice('/rest/v1'.length),upstreams.rest,url.search);
+  else if(/^\/functions\/v1\/(cop-manage-users|cop-change-password|cop-initial-setup)$/.test(url.pathname))destination=route(url.pathname.slice('/functions/v1'.length),upstreams.functions);
   else {reply(404,{error:'Não encontrado'});return;}
+  }catch{reply(400,{error:'Solicitação inválida'});return;}
   const isToken=url.pathname==='/auth/v1/token';
   const maximum=isToken?16384:8*1024*1024;
   try{
