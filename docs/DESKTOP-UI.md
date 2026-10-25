@@ -25,3 +25,7 @@ RJ, ES e MG usam seus estados. CO e NO agrupam os contornos das respectivas regi
 - Nenhuma chamada ou compartilhamento de contatos reais foi realizado.
 
 Reversão disponível para o deployment anterior `dpl_BJqir8arqcuHitvoTeEJinkL55EG`. A apresentação como janela nativa deve ser confirmada no Chrome do usuário, pois a prévia local validou o contrato da chamada de abertura.
+
+## Publicação
+
+Commit de código `49a4d33`, deployment `dpl_CQiGpYpLagfEVhT8Aydc1tTw5gbr`, produção READY no endereço https://central-cop-escalonamentos.vercel.app/. Worker gerado `cop-public-static-614a0ea5e9a0ec42`. HTML, CSS, módulos novos e worker retornaram HTTP 200 com o conteúdo esperado e CSP preservada. Configuração do backend e proteção das URLs individuais/previews mantidas.
