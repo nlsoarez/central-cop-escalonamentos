@@ -90,3 +90,14 @@ Para cada aparelho:
 - Demonstração de cartão com dados fictícios: `output/mobile/cartao-mobile.png`.
 
 Os testes físicos Android/iPhone listados acima continuam pendentes. Não foram substituídos pela recuperação de sessão observada no navegador desktop ou pela simulação de larguras.
+
+## Correção de compartilhamento — 25/10/2026
+
+Relato recebido em Android Chrome/PWA: compartilhamento rejeitado pelo aparelho. Sem o erro nativo do dispositivo, não é possível afirmar qual restrição do Android causou a recusa. O código anterior descartava essa distinção e alterava apenas o botão já renderizado; a reconstrução dos cartões na revalidação da sessão perdia a alternativa de cópia.
+
+- Recusa da vCard oferece **Compartilhar texto** em um novo toque, sem repetir uma chamada nativa após consumir a ativação do usuário.
+- Recusa do texto oferece **Copiar informações** em um novo toque. Cancelamento continua silencioso, sem cópia automática.
+- O modo de alternativa é mantido somente em memória durante a sessão, inclusive quando os cartões são recriados. Logout limpa esse modo e respostas antigas não alteram uma nova sessão.
+- Chamadas concorrentes de compartilhamento são bloqueadas. Nenhum dado adicional é salvo ou enviado automaticamente.
+- Validação: 100 testes aprovados, sintaxe e build aprovados. Navegador em 390 px com contatos sintéticos: recusa de arquivo simulada, revalidação de sessão, alternativa preservada e texto entregue ao substituto local da API; sem overflow. Evidência: `output/mobile/compartilhar-texto.png`.
+- Reversão: deployment anterior `dpl_5EM8cuMRqF4ZH7pDBdiLE4DeYbou`. Confirmação do compartilhamento nativo no Android físico depende do teste do usuário após atualizar o portal.

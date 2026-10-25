@@ -39,6 +39,7 @@ const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))|
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
 const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 state.connection=navigator.onLine===false?'unavailable':'online';
+state.shareMode='auto';state.sharePending=false;
 const mobile=()=>matchMedia('(max-width: 760px)').matches;
 const toast=(message,kind='info')=>{
  state.notice={message,kind};
@@ -103,7 +104,7 @@ function contactCard(c){
   '<div class="contact-meta">'+phone+(notes?'<div class="notes">'+ic('info',14)+' '+h(notes)+'</div>':'')+'</div>'+
   '<div class="contact-actions">'+(enabled?'<a class="btn primary dial-action mobile-only" href="'+dial+'">'+ic('phone',17)+' Ligar</a>':'<button class="btn primary dial-action mobile-only" disabled>'+ic('phone',17)+' Ligar</button>')+
   '<button class="btn whatsapp" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
-  '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo?'disabled':'')+'>'+ic('share',17)+' '+(typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
+  '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo||state.sharePending?'disabled':'')+'>'+ic('share',17)+' '+(state.shareMode==='copy'?'Copiar informações':state.shareMode==='text'?'Compartilhar texto':typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
   '<button class="btn subtle desktop-only" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button>'+
   '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+
   '<button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" aria-pressed="'+isFav+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',19)+'</button>'+
@@ -197,6 +198,7 @@ function loginView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo">'+ic('bolt',36)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>Matrícula ou e-mail de administrador<input type="text" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
 }
 function clearPrivateState(){
+ state.shareMode='auto';state.sharePending=false;
  try{if(state.user?.id)sessionStorage.removeItem('cop-consultation:'+state.user.id);}catch{}
  state.sessionEpoch=(state.sessionEpoch||0)+1;
  state.pendingRoster=[];state.user=null;state.contacts=[];state.accounts=[];state.batches=[];state.audit=[];state.upload=null;
@@ -467,12 +469,20 @@ root.addEventListener('click',async e=>{
  if(action==='recent'){state.filters={query:btn.dataset.query||'',cluster:btn.dataset.cluster||'',area:'',cidade:'',topologia:'',cargo:'',nivel:''};state.view='consultar';render();return;}
  if(action==='jump'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c){state.filters={cluster:c.cluster,area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:c.full_name};state.view='consultar';render();}return;}
  if(action==='copy'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c)return;try{await copyText(c.phone_display||c.phone_e164||'');toast('Telefone copiado.','success');}catch{toast('Cópia não permitida neste navegador.','error');}return;}
- if(action==='share'||action==='share-copy'){
+ if(action==='share'){
   const c=state.contacts.find(x=>x.id===btn.dataset.id);if(!c||store.demo)return;
+  if(state.sharePending)return;
+  const epoch=state.sessionEpoch||0;
+  state.sharePending=true;
   try{
-   if(action==='share-copy'){await copyText(contactShareText(c));toast('Informações copiadas.','success');return;}
-   const result=await shareContact(c,{copy:copyText});if(result.kind==='copied')toast('Informações copiadas.','success');
-  }catch(error){btn.dataset.action='share-copy';btn.textContent='Copiar informações';toast(error.message,'error');}
+   if(state.shareMode==='copy'){await copyText(contactShareText(c));if(epoch===(state.sessionEpoch||0))toast('Informações copiadas.','success');return;}
+   const result=await shareContact(c,{copy:copyText,mode:state.shareMode});
+   if(epoch!==(state.sessionEpoch||0))return;
+   if(result.kind==='text-required'){state.shareMode='text';toast('O aparelho recusou o arquivo de contato. Toque em Compartilhar texto.');}
+   if(result.kind==='copy-required'){state.shareMode='copy';toast('Compartilhamento indisponível. Toque em Copiar informações.');}
+   if(result.kind==='copied')toast('Informações copiadas.','success');
+  }catch{if(epoch===(state.sessionEpoch||0))toast('Não foi possível copiar. Tente novamente.','error');}
+  finally{if(epoch===(state.sessionEpoch||0)){state.sharePending=false;render();}}
   return;
  }
  if(action==='whatsapp'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c&&!store.demo&&whatsappUrl(c))window.open(whatsappUrl(c),'_blank','noopener,noreferrer');return;}

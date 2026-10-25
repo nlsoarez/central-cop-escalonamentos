@@ -22,7 +22,20 @@ test('compartilha vCard quando suportado, texto senão, cópia apenas sem API e 
  assert.equal((await shareContact(contact,{nav:{canShare:()=>false,share:files.share}})).kind,'text');assert.match(payload.text,/Telefone:/);
  assert.equal((await shareContact(contact,{nav:{},copy:async()=>copies++})).kind,'copied');assert.equal(copies,1);
  assert.equal((await shareContact(contact,{nav:{share:async()=>{throw Object.assign(Error(),{name:'AbortError'});}},copy:async()=>copies++})).kind,'cancelled');assert.equal(copies,1);
- await assert.rejects(shareContact(contact,{nav:{share:async()=>{throw Error('blocked');}},copy:async()=>copies++}));assert.equal(copies,1);
+ assert.equal((await shareContact(contact,{nav:{share:async()=>{throw Error('blocked');}},copy:async()=>copies++})).kind,'copy-required');assert.equal(copies,1);
+});
+test('recusa de vCard oferece texto em novo clique, sem repetir a API ou copiar automaticamente',async()=>{
+ let calls=0,copies=0;
+ const nav={canShare:()=>true,share:async p=>{calls++;if(p.files)throw Object.assign(Error(),{name:'NotAllowedError'});assert.match(p.text,/Telefone:/);}};
+ assert.equal((await shareContact(contact,{nav,copy:async()=>copies++})).kind,'text-required');
+ assert.equal(calls,1);assert.equal(copies,0);
+ assert.equal((await shareContact(contact,{nav,mode:'text'})).kind,'text');assert.equal(calls,2);
+});
+test('cancelar arquivo ou texto não avança alternativas nem copia dados',async()=>{
+ for(const mode of ['auto','text']){
+  const nav={canShare:()=>true,share:async()=>{throw Object.assign(Error(),{name:'AbortError'});}};
+  assert.equal((await shareContact(contact,{nav,mode,copy:()=>assert.fail('unexpected copy')})).kind,'cancelled');
+ }
 });
 test('retorno do segundo plano deduplica verificações e não confunde falha de rede com logout',async()=>{
  let resolve,called=0;const events=[];
