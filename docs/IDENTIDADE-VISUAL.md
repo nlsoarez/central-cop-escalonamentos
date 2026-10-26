@@ -10,6 +10,8 @@ Prompt final utilizado:
 
 Evidência visual: `output/login/login-sem-borda-branca.png`. Os registros abaixo descrevem as versões anteriores, que ainda continham o fundo original branco.
 
+Correção publicada: código `f0998e6`, deployment `dpl_CvDPRS9hmwTTYoBAEus2jbC7GwTZ` READY, worker `cop-public-static-7ebf4e9117477566`. Validação local: 103 testes aprovados e cantos alpha=0 nos seis PNGs. Em produção, os arquivos RGBA retornaram HTTP 200 e hashes idênticos aos locais, inclusive nas URLs versionadas. Reversão para o deployment anterior: `dpl_6oR5CScsAbdd8tzQrqFwQLtek1Ru`.
+
 ## Ícone atual e login — atualização de 25/10/2026
 
 O anexo **Ícone de Operações com Headset.png** substituiu a arte anterior. O arquivo original atual está em `assets/central-cop-official.png`. Todos os tamanhos derivados mantêm a imagem completa, sem acrescentar bordas, sombras ou margens; a versão maskable agora também usa a mesma imagem de 512 px, sem a margem adicional da versão anterior. Os fundos e detalhes já existentes na arte enviada foram preservados. Os elementos `<img>` da marca têm borda e sombra CSS zeradas.
