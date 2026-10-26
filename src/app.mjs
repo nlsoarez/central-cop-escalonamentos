@@ -37,7 +37,7 @@ const iconPaths={
  bolt:'<path d="m13 2-9 11h7l-1 9 10-12h-7z"/>'
 };
 const ic=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(iconPaths[name]||iconPaths.info)+'</svg>';
-const brandIcon=(size=42)=>'<img class="brand-icon" src="/assets/icon-192.png" alt="" width="'+size+'" height="'+size+'" />';
+const brandIcon=(size=42)=>'<img class="brand-icon" src="/assets/icon-192.png?v=headset-transparent" alt="" width="'+size+'" height="'+size+'" />';
 const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};

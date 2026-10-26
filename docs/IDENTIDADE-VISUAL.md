@@ -1,5 +1,15 @@
 # Ícone oficial do Central COP
 
+## Correção do fundo branco — 25/10/2026
+
+A borda relatada era parte dos pixels do arquivo enviado, e não uma borda CSS. Foi removido o fundo externo com o modo integrado `image_gen`, skill imagegen, gerando um recorte PNG com transparência real. Arquivo final do projeto: `assets/central-cop-official.png`. Os seis derivados preservam o canal alpha e têm cantos transparentes. A prévia no painel escuro confirmou a remoção do retângulo branco. Favicon e imagens de marca receberam nova versão na URL para renovar o cache.
+
+Prompt final utilizado:
+
+> Use case: background-extraction. Edit target: the supplied Central COP glossy red rounded-square headset icon. Remove ONLY the white/gray background OUTSIDE the red rounded-square silhouette, including the rectangular white outer margin. Output a PNG with genuine alpha transparency outside the icon. Preserve the red icon's silhouette, glossy reflections, beveled red rim, white headset/operator symbol, white circular strokes, red waves and exact internal arrangement; do not redesign, add text, add a border or add a new shadow. White elements INSIDE the red square are part of the artwork and must remain fully opaque. Use a clean alpha edge with no white fringe, white matte, rectangular white patch or checkerboard baked into pixels. Keep this same single icon centered, with very little transparent padding, suitable for use on a dark navy header. The goal is a faithful background cutout of the existing artwork, not a new logo.
+
+Evidência visual: `output/login/login-sem-borda-branca.png`. Os registros abaixo descrevem as versões anteriores, que ainda continham o fundo original branco.
+
 ## Ícone atual e login — atualização de 25/10/2026
 
 O anexo **Ícone de Operações com Headset.png** substituiu a arte anterior. O arquivo original atual está em `assets/central-cop-official.png`. Todos os tamanhos derivados mantêm a imagem completa, sem acrescentar bordas, sombras ou margens; a versão maskable agora também usa a mesma imagem de 512 px, sem a margem adicional da versão anterior. Os fundos e detalhes já existentes na arte enviada foram preservados. Os elementos `<img>` da marca têm borda e sombra CSS zeradas.
