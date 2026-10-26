@@ -30,3 +30,14 @@ Prévia com dados fictícios verificou envio pelo leitor, análise administrativ
 ## Implantação
 
 Aplicar primeiro `20261026010000_contact_reports.sql` exclusivamente no banco do Central COP, com backup criptografado antes. Recarregar o esquema do PostgREST por NOTIFY; não é necessário reiniciar serviços. Depois publicar o frontend no projeto Vercel existente. A reversão do frontend mantém os relatos privados no banco para preservar dados. Não excluir relatos durante reversão.
+
+## Resultado publicado
+
+- 108 testes aprovados, sintaxe e build aprovados.
+- Migração aplicada no banco exclusivo do Central COP. Backup criptografado de banco e configuração: `20261026T194537Z`; estado privado da implantação: `.state/improvements-20261026-b8ae201a`.
+- A conta solicitada foi conferida por matrícula e nome e promovida a administradora; conta ativa e exigência de senha pessoal preservadas. Uma ocorrência `promote_admin` registrada no histórico privado. Nenhuma senha foi lida ou alterada.
+- Os 1.841 contatos permaneceram idênticos antes e depois da migração, verificados por digest de todas as linhas. Nenhum relato operacional criado pelos testes. Nenhum serviço reiniciado.
+- Acesso anônimo aos relatos retornou HTTP 401 em produção. Privilégios de leitura anônima e inserção direta por leitores confirmados como ausentes.
+- Chave temporária revogada e par local removido; as quatro chaves originais foram comparadas e preservadas.
+- Código principal `30de15e`, rótulo de auditoria `54aefa2`; deployment `dpl_DJr6eLjHM6vf9NZQPRPymYTn6MYT` READY, worker `cop-public-static-a8af1e2a8d7b2746` no domínio principal. App, store, módulo de relatos e CSS em produção retornaram HTTP 200 e hashes SHA-256 idênticos aos locais.
+- Reversão de frontend: `dpl_4J8Jnabu4heaAUXZCCj2aZ5qskyP`. Preservar o banco e os relatos em caso de reversão; não retirar a promoção solicitada sem autorização específica.
