@@ -8,6 +8,8 @@ O login tem painel de contexto com o datacenter no desktop, formulário dedicado
 
 Verificação desta atualização: 103 testes aprovados, sintaxe e build aprovados. Navegador com respostas locais simuladas verificou carregamento, alternância de senha, envio pendente, recuperação após erro e entrada bem-sucedida; nenhuma credencial real foi usada. Layouts em 320, 360, 390, 430, 768, 1024 e 1440 px sem overflow horizontal; borda computada da marca em 0 px e nenhum erro de console. Capturas: `output/login/login-desktop.png`, `login-dark.png` e `login-mobile.png`.
 
+Publicação atual: código `0a9bcd8`, deployment `dpl_6oR5CScsAbdd8tzQrqFwQLtek1Ru` READY, worker `cop-public-static-0d52f65937feb9c8`. Verificados no domínio principal os seis PNGs com HTTP 200 e hash idêntico ao local, além do novo login, CSS, favicon versionado e worker com CSP preservada. Reversão: `dpl_Ck3xpJfFFSnRjU2Axs99wB3C7KSk`.
+
 ## Histórico da arte anterior
 
 Arte fornecida pelo usuário em 25/10/2026, preservada em `assets/central-cop-official.png` (1254 × 1254). Substitui o símbolo anterior de raio na identificação do projeto.
