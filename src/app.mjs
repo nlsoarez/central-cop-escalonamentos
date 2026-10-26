@@ -12,8 +12,31 @@ const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
 if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
+/* WhatsApp glyph: Bootstrap Icons, https://github.com/twbs/icons
+The MIT License (MIT)
+
+Copyright (c) 2019-2024 The Bootstrap Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
 const iconPaths={
- whatsapp:'<path d="M20 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.1-4.2A8.5 8.5 0 1 1 20 11.5Z"/><path d="M8 7.5h1.5l1 2-1 1a8 8 0 0 0 3 3l1-1 2 1V15c0 .8-.8 1.2-1.6 1A11.7 11.7 0 0 1 7 9.1c-.2-.8.2-1.6 1-1.6Z"/>',
+ whatsapp:'<path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>',
  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
  lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
  moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
@@ -38,7 +61,7 @@ const iconPaths={
  chevron:'<path d="m9 18 6-6-6-6"/>',
  bolt:'<path d="m13 2-9 11h7l-1 9 10-12h-7z"/>'
 };
-const ic=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(iconPaths[name]||iconPaths.info)+'</svg>';
+const ic=(name,size=18)=>'<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+(name==='whatsapp'?'16 16':'24 24')+'" fill="'+(name==='whatsapp'?'currentColor':'none')+'" stroke="'+(name==='whatsapp'?'none':'currentColor')+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(iconPaths[name]||iconPaths.info)+'</svg>';
 const brandIcon=(size=42)=>'<img class="brand-icon" src="/assets/icon-192.png?v=headset-transparent" alt="" width="'+size+'" height="'+size+'" />';
 const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
@@ -114,7 +137,7 @@ function contactCard(c){
   '<div class="contact-person"><div class="person-avatar">'+ic('users',22)+'</div><div class="person-details"><h3>'+h(c.full_name)+'</h3>'+(c.cargo?'<div class="role">'+h(c.cargo)+'</div>':'')+(place?'<div class="dim">'+h(place)+'</div>':'')+'<div class="tags">'+(c.topologia?'<span class="tag">'+h(c.topologia)+'</span>':'')+(!valid?'<span class="tag warn">Fora da vigência informada</span>':'')+(c.active===false?'<span class="tag warn">Inativo</span>':'')+'</div></div></div>'+
   '<div class="contact-meta">'+phone+(notes?'<div class="notes">'+ic('info',14)+' '+h(notes)+'</div>':'')+'</div>'+
   '<div class="contact-actions"><div class="mobile-primary-actions mobile-only">'+(enabled?'<a class="btn primary dial-action" href="'+dial+'">'+ic('phone',21)+'<span>Ligar</span></a>':'<button class="btn primary dial-action" disabled>'+ic('phone',21)+'<span>Ligar</span></button>')+'<button class="btn whatsapp" '+(!enabled?'disabled':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('whatsapp',22)+'<span>WhatsApp</span></button></div>'+
-  '<button class="btn whatsapp desktop-only" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
+  '<button class="btn whatsapp desktop-only" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('whatsapp',16)+' WhatsApp</button>'+
   '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo||state.sharePending?'disabled':'')+'>'+ic('share',17)+' '+(state.shareMode==='copy'?'Copiar informações':typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
   '<button class="btn subtle desktop-only" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button>'+
   '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+

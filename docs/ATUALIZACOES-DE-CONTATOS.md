@@ -33,6 +33,10 @@ Aplicar primeiro `20261026010000_contact_reports.sql` exclusivamente no banco do
 
 ## Resultado publicado
 
+### Ajuste visual do WhatsApp
+
+O desenho simplificado foi substituído pelo SVG preenchido do [Bootstrap Icons](https://github.com/twbs/icons/blob/main/icons/whatsapp.svg), com licença MIT e aviso preservados no módulo. O glifo usa o viewBox original 16 × 16, sem stroke adicional; apresentação em 22 px no mobile e 16 px no desktop. Prévia em 390 px confirmou proporção, preenchimento, ausência de overflow e nenhuma chamada ou abertura do WhatsApp. Sintaxe e build aprovados. Evidência: `output/reports/whatsapp-vetorial.png`.
+
 - 108 testes aprovados, sintaxe e build aprovados.
 - Migração aplicada no banco exclusivo do Central COP. Backup criptografado de banco e configuração: `20261026T194537Z`; estado privado da implantação: `.state/improvements-20261026-b8ae201a`.
 - A conta solicitada foi conferida por matrícula e nome e promovida a administradora; conta ativa e exigência de senha pessoal preservadas. Uma ocorrência `promote_admin` registrada no histórico privado. Nenhuma senha foi lida ou alterada.
