@@ -15,27 +15,24 @@ test('vCard escapa injeção de linhas e mantém limites de bytes UTF-8',()=>{
  assert.match(card,/TEL;TYPE=VOICE:\+5521999990001/);assert.doesNotMatch(card,/\r\nTEL:evil/);assert.match(card,/\\nTEL:evil\\;\\,/);
  assert.ok(card.split('\r\n').every(line=>new TextEncoder().encode(line).length<=75));assert.doesNotMatch(card,/fonte privada/);
 });
-test('compartilha vCard quando suportado, texto senão, cópia apenas sem API e cancelamento silencioso',async()=>{
+test('compartilha texto diretamente, cópia apenas sem API e cancelamento silencioso',async()=>{
  let payload,copies=0;
  const files={canShare:()=>true,share:async p=>{payload=p;}};
- assert.equal((await shareContact(contact,{nav:files})).kind,'vcard');assert.equal(payload.files[0].type,'text/vcard');
+ assert.equal((await shareContact(contact,{nav:files})).kind,'text');assert.equal(payload.files,undefined);assert.match(payload.text,/Telefone:/);
  assert.equal((await shareContact(contact,{nav:{canShare:()=>false,share:files.share}})).kind,'text');assert.match(payload.text,/Telefone:/);
  assert.equal((await shareContact(contact,{nav:{},copy:async()=>copies++})).kind,'copied');assert.equal(copies,1);
  assert.equal((await shareContact(contact,{nav:{share:async()=>{throw Object.assign(Error(),{name:'AbortError'});}},copy:async()=>copies++})).kind,'cancelled');assert.equal(copies,1);
  assert.equal((await shareContact(contact,{nav:{share:async()=>{throw Error('blocked');}},copy:async()=>copies++})).kind,'copy-required');assert.equal(copies,1);
 });
-test('recusa de vCard oferece texto em novo clique, sem repetir a API ou copiar automaticamente',async()=>{
+test('primeiro clique ignora suporte a arquivos e envia somente texto em uma única chamada',async()=>{
  let calls=0,copies=0;
- const nav={canShare:()=>true,share:async p=>{calls++;if(p.files)throw Object.assign(Error(),{name:'NotAllowedError'});assert.match(p.text,/Telefone:/);}};
- assert.equal((await shareContact(contact,{nav,copy:async()=>copies++})).kind,'text-required');
+ const nav={canShare:()=>assert.fail('não deve consultar suporte a arquivos'),share:async p=>{calls++;assert.equal(p.files,undefined);assert.match(p.text,/Telefone:/);}};
+ assert.equal((await shareContact(contact,{nav,copy:async()=>copies++})).kind,'text');
  assert.equal(calls,1);assert.equal(copies,0);
- assert.equal((await shareContact(contact,{nav,mode:'text'})).kind,'text');assert.equal(calls,2);
 });
-test('cancelar arquivo ou texto não avança alternativas nem copia dados',async()=>{
- for(const mode of ['auto','text']){
+test('cancelar texto não avança alternativas nem copia dados',async()=>{
   const nav={canShare:()=>true,share:async()=>{throw Object.assign(Error(),{name:'AbortError'});}};
-  assert.equal((await shareContact(contact,{nav,mode,copy:()=>assert.fail('unexpected copy')})).kind,'cancelled');
- }
+  assert.equal((await shareContact(contact,{nav,copy:()=>assert.fail('unexpected copy')})).kind,'cancelled');
 });
 test('retorno do segundo plano deduplica verificações e não confunde falha de rede com logout',async()=>{
  let resolve,called=0;const events=[];

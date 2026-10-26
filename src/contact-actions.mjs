@@ -22,20 +22,16 @@ export function contactVCard(contact){
  const note=[['Nível',contact.nivel],['Região',contact.cluster],['Área',contact.area],['Localidade',contact.cidade],['Topologia',contact.topologia]].filter(([,v])=>v).map(([k,v])=>k+': '+v).join('\n');
  return ['BEGIN:VCARD','VERSION:3.0','FN:'+escapeVCard(contact.full_name),'N:;'+escapeVCard(contact.full_name)+';;;',...(contact.cargo?['TITLE:'+escapeVCard(contact.cargo)]:[]),...(phone.valid?['TEL;TYPE=VOICE:+'+phone.e164]:[]),...(note?['NOTE:'+escapeVCard(note)]:[]),'END:VCARD'].map(fold).join('\r\n')+'\r\n';
 }
-export async function shareContact(contact,{nav=globalThis.navigator,FileType=globalThis.File,copy,mode='auto'}={}){
+export async function shareContact(contact,{nav=globalThis.navigator,copy}={}){
  const text=contactShareText(contact);
  if(typeof nav?.share==='function'){
-  let file;
-  if(mode==='auto'&&FileType&&nav.canShare){
-   const name=(String(contact.full_name||'contato').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').slice(0,60)||'contato')+'.vcf';
-   const candidate=new FileType([contactVCard(contact)],name,{type:'text/vcard'});
-   try{if(nav.canShare({files:[candidate]}))file=candidate;}catch{}
-  }
-  try{await nav.share(file?{files:[file]}:{title:'Central COP — Escalonamentos',text});return {kind:file?'vcard':'text'};}
+  // File capability checks do not guarantee that Android will accept a vCard.
+  // Open the native text sheet directly in this user gesture, without a file probe.
+  try{await nav.share({title:'Central COP — Escalonamentos',text});return {kind:'text'};}
   catch(error){
    if(error?.name==='AbortError')return {kind:'cancelled'};
    // A rejected native share may consume user activation. Retry only on a fresh click.
-   return {kind:file?'text-required':'copy-required'};
+   return {kind:'copy-required'};
   }
  }
  if(!copy)throw Error('Compartilhamento indisponível neste navegador.');

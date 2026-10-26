@@ -102,3 +102,13 @@ Relato recebido em Android Chrome/PWA: compartilhamento rejeitado pelo aparelho.
 - Validação: 100 testes aprovados, sintaxe e build aprovados. Navegador em 390 px com contatos sintéticos: recusa de arquivo simulada, revalidação de sessão, alternativa preservada e texto entregue ao substituto local da API; sem overflow. Evidência: `output/mobile/compartilhar-texto.png`.
 - Reversão: deployment anterior `dpl_5EM8cuMRqF4ZH7pDBdiLE4DeYbou`. Confirmação do compartilhamento nativo no Android físico depende do teste do usuário após atualizar o portal.
 - Publicado: commit `8c9d9a0`, deployment `dpl_BJqir8arqcuHitvoTeEJinkL55EG` READY no endereço principal. Worker `cop-public-static-aba26a8adb67be73`. Página, módulos corrigidos e worker validados em HTTP 200 com CSP preservada.
+
+## Compartilhamento direto em texto — 26/10/2026
+
+O usuário voltou a relatar o aviso de recusa do arquivo no Android Chrome/PWA. O fluxo anterior ainda tentava uma vCard no primeiro toque e exigia outro toque para o texto. Esse fluxo foi substituído: **Compartilhar** agora chama `navigator.share({title, text})` diretamente, sem criar arquivo nem consultar `canShare`.
+
+- O primeiro toque já abre o compartilhamento das informações em texto; não há tentativa de vCard ou aviso intermediário de arquivo recusado.
+- Cancelar permanece silencioso. Se o compartilhamento de texto for recusado, a opção de copiar continua dependendo de novo gesto explícito. Sem API nativa, a cópia permanece disponível.
+- Não há envio automático a contatos ou aplicativos, nem alteração de autenticação ou permissões.
+- Validação: 103 testes aprovados, sintaxe e build aprovados. Regressão verifica uma única chamada nativa com texto e nenhuma consulta a suporte de arquivos. Na prévia de 390 px com contatos fictícios, o primeiro toque entregou o texto à API simulada, sem toast e mantendo o rótulo Compartilhar. Evidência: `output/mobile/compartilhar-direto.png`.
+- Não foi executada a folha nativa de compartilhamento em um Android físico; essa confirmação depende do teste do usuário após atualizar o portal.

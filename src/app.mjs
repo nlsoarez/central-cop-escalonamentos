@@ -113,7 +113,7 @@ function contactCard(c){
   '<div class="contact-meta">'+phone+(notes?'<div class="notes">'+ic('info',14)+' '+h(notes)+'</div>':'')+'</div>'+
   '<div class="contact-actions">'+(enabled?'<a class="btn primary dial-action mobile-only" href="'+dial+'">'+ic('phone',17)+' Ligar</a>':'<button class="btn primary dial-action mobile-only" disabled>'+ic('phone',17)+' Ligar</button>')+
   '<button class="btn whatsapp" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
-  '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo||state.sharePending?'disabled':'')+'>'+ic('share',17)+' '+(state.shareMode==='copy'?'Copiar informações':state.shareMode==='text'?'Compartilhar texto':typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
+  '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo||state.sharePending?'disabled':'')+'>'+ic('share',17)+' '+(state.shareMode==='copy'?'Copiar informações':typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
   '<button class="btn subtle desktop-only" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button>'+
   '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+
   '<button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" aria-pressed="'+isFav+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',19)+'</button>'+
@@ -507,9 +507,8 @@ root.addEventListener('click',async e=>{
   state.sharePending=true;
   try{
    if(state.shareMode==='copy'){await copyText(contactShareText(c));if(epoch===(state.sessionEpoch||0))toast('Informações copiadas.','success');return;}
-   const result=await shareContact(c,{copy:copyText,mode:state.shareMode});
+   const result=await shareContact(c,{copy:copyText});
    if(epoch!==(state.sessionEpoch||0))return;
-   if(result.kind==='text-required'){state.shareMode='text';toast('O aparelho recusou o arquivo de contato. Toque em Compartilhar texto.');}
    if(result.kind==='copy-required'){state.shareMode='copy';toast('Compartilhamento indisponível. Toque em Copiar informações.');}
    if(result.kind==='copied')toast('Informações copiadas.','success');
   }catch{if(epoch===(state.sessionEpoch||0))toast('Não foi possível copiar. Tente novamente.','error');}
