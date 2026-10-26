@@ -12,6 +12,8 @@ const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')
 if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 const iconPaths={
+ eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+ lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
  moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
  share:'<path d="M12 16V3m-4 4 4-4 4 4M5 12v8h14v-8"/>',
  search:'<circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/>',
@@ -201,7 +203,8 @@ function renderModal(){
  return '<div class="modal-backdrop" data-action="close-modal"><div class="modal-card" role="dialog" aria-modal="true" aria-label="Editar contato"><div class="modal-top"><h3>'+(c.id?'Editar contato':'Novo contato')+'</h3><button class="icon-btn" data-action="close-modal" aria-label="Fechar">×</button></div><form id="contactForm" class="edit-grid">'+select('cluster','Cluster',CLUSTERS,c.cluster||'RJ')+textInput('area','Área',c.area)+textInput('cidade','Cidade / Localidade',c.cidade)+textInput('topologia','Topologia',c.topologia)+textInput('full_name','Nome completo',c.full_name,'required')+textInput('cargo','Cargo',c.cargo)+textInput('nivel','Nível de escalonamento',c.nivel)+textInput('phone_e164','Telefone com DDD',c.phone_display||c.phone_e164,'required')+select('scope','Abrangência',['local','regional'],c.scope||'local')+textInput('notes','Observações',c.notes)+textInput('valid_from','Válido a partir de (AAAA-MM-DD)',c.valid_from)+textInput('valid_until','Válido até (AAAA-MM-DD)',c.valid_until)+'<label class="check-field"><input type="checkbox" name="active" '+(c.active!==false?'checked':'')+'/> Contato ativo</label><div class="modal-actions"><button type="button" class="btn subtle" data-action="close-modal">Cancelar</button><button type="submit" class="btn primary" '+(state.busy?'disabled':'')+'>Salvar contato</button></div></form></div></div>';
 }
 function loginView(){
- return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo official-logo">'+brandIcon(72)+'</div><span class="overline">CENTRAL COP</span><h1>Escalonamentos</h1><p>Entre com seu acesso autorizado para consultar contatos internos.</p><form id="loginForm"><label>Matrícula ou e-mail de administrador<input type="text" name="email" required autocomplete="username"/></label><label>Senha<input type="password" name="password" required autocomplete="current-password"/></label><button class="btn primary" type="submit">Entrar</button></form><small>Cadastro restrito. Solicite acesso ao administrador do portal.</small></div></div>';
+ const dark=document.documentElement.dataset.theme==='dark';
+ return '<div class="login-screen"><div class="login-layout"><aside class="login-story" aria-label="Central COP — Escalonamentos"><div class="login-brand">'+brandIcon(64)+'<div><strong>Central COP</strong><span>ESCALONAMENTOS</span></div></div><div class="login-story-copy"><span class="login-eyebrow">CENTRAL DE OPERAÇÕES</span><h2>Gestão de escalonamentos<br>operacionais.</h2><p>Encontre os responsáveis por região, localidade e nível de atendimento.</p><div class="login-capabilities"><span>'+ic('map',16)+' Regiões</span><span>'+ic('users',16)+' Responsáveis</span><span>'+ic('phone',16)+' Contatos</span></div></div><div class="login-story-footer"><span class="login-status-dot"></span>Portal interno · Equipe COP</div></aside><section class="login-main" aria-labelledby="login-title"><header class="login-main-top"><span>ACESSO AO PORTAL</span><button type="button" class="login-theme" data-action="theme" aria-pressed="'+dark+'" aria-label="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon',19)+'</button></header><div class="login-form-wrap"><div class="login-mobile-brand">'+brandIcon(56)+'<strong>Central COP<span>ESCALONAMENTOS</span></strong></div><span class="overline">BEM-VINDO À CENTRAL COP</span><h1 id="login-title">Entre na sua conta</h1><p class="login-lead">Acesse o diretório de contatos e escalonamentos da sua operação.</p><form id="loginForm" aria-busy="'+Boolean(state.loginPending)+'"><label for="login-user">Matrícula ou e-mail</label><div class="login-input">'+ic('users',18)+'<input id="login-user" type="text" name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Sua matrícula ou e-mail" /></div><div class="login-password-heading"><label for="login-password">Senha</label><span>Seu acesso pessoal</span></div><div class="login-input">'+ic('lock',18)+'<input id="login-password" type="password" name="password" required autocomplete="current-password" placeholder="Digite sua senha" /><button type="button" class="password-toggle" data-action="toggle-password" aria-controls="login-password" aria-label="Mostrar senha" aria-pressed="false">'+ic('eye',19)+'</button></div><button class="btn primary login-submit" type="submit" '+(state.loginPending?'disabled':'')+'><span>'+(state.loginPending?'Entrando…':'Entrar no portal')+'</span>'+ic('chevron',18)+'</button></form><div class="login-access-note">'+ic('info',18)+'<p><strong>Precisa de acesso?</strong><br>Solicite seu cadastro ao administrador do portal.</p></div></div><footer class="login-footer">'+ic('lock',14)+' Acesso exclusivo para usuários autorizados</footer></section></div></div>';
 }
 function clearPrivateState(){
  state.shareMode='auto';state.sharePending=false;
@@ -300,12 +303,21 @@ root.addEventListener('submit',async e=>{
   e.preventDefault();state.filters.query=new FormData(e.target).get('query')?.trim()||'';saveRecent();render();return;
  }
  if(e.target.id==='loginForm'){
-  e.preventDefault();const f=new FormData(e.target);
+  e.preventDefault();if(state.loginPending)return;
+  const f=new FormData(e.target);state.loginPending=true;
+  const submit=e.target.querySelector('[type="submit"]');
+  e.target.setAttribute('aria-busy','true');submit.disabled=true;submit.querySelector('span').textContent='Entrando…';
+  try{
   try{state.user=await store.signIn(String(f.get('email')),String(f.get('password')));}
   catch(error){toast(['session','network'].includes(error.stage)?error.message:'Não foi possível entrar. Confira matrícula e senha ou procure o administrador.','error');return;}
   loadPreferences();
   try{if(state.user?.active&&!state.user.must_change_password)await refresh();else render();}
   catch{render();toast('Login confirmado, mas não foi possível carregar os dados. Recarregue a página para tentar novamente.','error');}
+  }finally{
+   state.loginPending=false;
+   const form=root.querySelector('#loginForm');
+   if(form){form.setAttribute('aria-busy','false');const button=form.querySelector('[type="submit"]');button.disabled=false;button.querySelector('span').textContent='Entrar no portal';}
+  }
   return;
  }
  if(e.target.id==='changePasswordForm'){
@@ -392,9 +404,18 @@ root.addEventListener('click',async e=>{
  }
  const action=btn.dataset.action;
  if(!action)return;
+ if(action==='toggle-password'){
+  const input=root.querySelector('#login-password');if(!input)return;
+  const show=input.type==='password';input.type=show?'text':'password';
+  btn.setAttribute('aria-pressed',String(show));btn.setAttribute('aria-label',show?'Ocultar senha':'Mostrar senha');return;
+ }
  if(action==='theme'){
   const next=document.documentElement.dataset.theme==='dark'?'light':'dark';
   document.documentElement.dataset.theme=next;try{localStorage.setItem('cop-theme',next);}catch{}
+  if(root.querySelector('#loginForm')){
+   btn.setAttribute('aria-pressed',String(next==='dark'));
+   btn.setAttribute('aria-label',next==='dark'?'Ativar tema claro':'Ativar tema escuro');btn.title=btn.getAttribute('aria-label');btn.innerHTML=ic(next==='dark'?'settings':'moon',19);return;
+  }
   captureDraft();render();return;
  }
  if(action==='retry-session'){await recoverSession({reload:true});return;}
@@ -551,5 +572,5 @@ document.addEventListener('visibilitychange',()=>{
 window.addEventListener('pageshow',event=>{if(event.persisted)recoverSession({reload:true});});
 window.addEventListener('offline',()=>{captureDraft();state.connection='unavailable';render();});
 window.addEventListener('online',()=>recoverSession({reload:true}));
-matchMedia('(max-width: 760px)').addEventListener('change',()=>{state.mobileMenu=false;render();});
+matchMedia('(max-width: 760px)').addEventListener('change',()=>{state.mobileMenu=false;if(!root.querySelector('#loginForm'))render();});
 setInterval(()=>{if(!state.busy&&state.user&&document.visibilityState!=='hidden')recoverSession({quiet:true});},30000);
