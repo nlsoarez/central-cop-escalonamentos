@@ -1,4 +1,5 @@
 import { CLUSTERS } from './core.mjs';
+import {accountAlias} from './users.mjs';
 
 // Exemplos completamente fictícios. SEM acionamento para números de demonstração.
 const DEMO_CONTACTS = [
@@ -55,9 +56,8 @@ export const store={
   },
   async signIn(identifier,password){
     if(!client)throw Error('Configure um Supabase independente para ativar o login.');
-    const login=String(identifier||'').trim().toUpperCase();
-    const email=login.includes('@') ? String(identifier).trim().toLowerCase() :
-      login.toLowerCase() + '@users.central-cop.invalid';
+    const value=String(identifier||'').trim();
+    const email=value.includes('@') ? value.toLowerCase() : accountAlias(value);
     // Alias interno na autenticação; senhas nunca são mantidas no navegador pelo portal.
     const result=await client.auth.signInWithPassword({email,password});
     if(result.error){
@@ -97,6 +97,18 @@ export const store={
   async userAudit(){
     if(!client)return [];
     return expect(await client.from('cop_user_audit').select('id,actor,target,event,created_at').order('created_at',{ascending:false}).limit(100));
+  },
+  async reports(){
+    if(!client)return [];
+    return expect(await client.from('cop_contact_reports').select('id,contact_id,contact_name,contact_cluster,contact_area,contact_city,reporter_id,reason,message,status,review_note,created_at,reviewed_at').order('status').order('created_at',{ascending:false}).limit(200));
+  },
+  async submitContactReport(contactId,reason,message){
+    if(!client)throw Error('Relatos indisponíveis na demonstração.');
+    return expect(await client.rpc('cop_submit_contact_report',{p_contact_id:contactId,p_reason:reason,p_message:message}));
+  },
+  async reviewContactReport(reportId,note){
+    if(!client)throw Error('Relatos indisponíveis na demonstração.');
+    return expect(await client.rpc('cop_review_contact_report',{p_report_id:reportId,p_note:note}));
   },
   async createUsers(users,onProgress=()=>{}){
     const results=[];

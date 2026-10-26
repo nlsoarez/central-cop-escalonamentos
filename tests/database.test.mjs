@@ -172,6 +172,54 @@ test('migrações, RLS, sessões e importações em PostgreSQL isolado',async t=
   await assert.rejects(publish([repeated[0],repeated[0]]),/duplicado/);
   assert.equal((await db.query("select count(*) from public.cop_contacts where cluster='NO'")).rows[0].count,3);
  });
+ await t.test('relatos são privados, não alteram contatos e apenas administrador pode concluir',async()=>{
+  await root();
+  const target=(await db.query("select id,full_name from public.cop_contacts where active limit 1")).rows[0];
+  await as('authenticated',viewer,viewerSession);
+  const result=await db.query("select public.cop_submit_contact_report($1,'left_role','Pessoa não atua mais nesta função.') id",[target.id]);
+  const report=result.rows[0].id;
+  assert.equal((await db.query('select count(*) from public.cop_contact_reports')).rows[0].count,1);
+  await assert.rejects(db.query("update public.cop_contact_reports set status='resolved' where id=$1",[report]),/permission denied/);
+  await assert.rejects(db.query('select public.cop_review_contact_report($1,$2)',[report,'fake']),/restrito/);
+  await assert.rejects(db.query("select public.cop_submit_contact_report($1,'invalid','Descrição suficiente')",[target.id]),/motivo/);
+  await assert.rejects(db.query("select public.cop_submit_contact_report($1,'other','curto')",[target.id]),/descrição/);
+  await as('authenticated',admin,adminSession);
+  assert.equal((await db.query('select contact_name from public.cop_contact_reports where id=$1',[report])).rows[0].contact_name,target.full_name);
+  const own=(await db.query("select public.cop_submit_contact_report($1,'contact_changed','Telefone precisa ser atualizado.') id",[target.id])).rows[0].id;
+  await db.query('select public.cop_review_contact_report($1,$2)',[report,'Cadastro conferido pela administração.']);
+  await assert.rejects(db.query('select public.cop_review_contact_report($1,$2)',[report,'again']),/já foi analisada/);
+  await as('authenticated',viewer,viewerSession);
+  assert.equal((await db.query('select count(*) from public.cop_contact_reports where id=$1',[own])).rows[0].count,0);
+  assert.equal((await db.query('select status,review_note from public.cop_contact_reports where id=$1',[report])).rows[0].status,'resolved');
+  assert.equal((await db.query('select full_name from public.cop_contacts where id=$1',[target.id])).rows[0].full_name,target.full_name);
+  await as('anon',null,null);
+  await assert.rejects(db.query('select * from public.cop_contact_reports'),/permission denied/);
+  await assert.rejects(db.query("select public.cop_submit_contact_report($1,'other','Descrição suficiente')",[target.id]),/permission denied/);
+ });
+ await t.test('relatos exigem sessão válida e impõem limite por usuário',async()=>{
+  await root();const target=(await db.query('select id from public.cop_contacts where active limit 1')).rows[0].id;
+  await as('authenticated',viewer,'29999999-0000-4000-8000-000000000001');
+  await assert.rejects(db.query("select public.cop_submit_contact_report($1,'other','Descrição suficiente')",[target]),/não autorizado/);
+  await as('authenticated',viewer,viewerSession);
+  for(let i=0;i<9;i++)await db.query("select public.cop_submit_contact_report($1,'other','Outra informação sobre o contato.')",[target]);
+  await assert.rejects(db.query("select public.cop_submit_contact_report($1,'other','Mais uma informação sobre o contato.')",[target]),/Limite/);
+ });
+ await t.test('promoção por operador confere matrícula e nome, é auditada e não reativa contas',async()=>{
+  await root();
+  await db.query("update public.cop_profiles set login_id='F9900001',display_name='Operador Sintético' where id=$1",[admin]);
+  await db.query("update public.cop_profiles set login_id='F9900002',display_name='Analista Sintético' where id=$1",[viewer]);
+  const template=await readFile(new URL('../deploy/promote-admin.sql',import.meta.url),'utf8');
+  const sql=name=>template.replaceAll(":'target_login'","'f9900002'").replaceAll(":'target_name'",name).replaceAll(":'operator_login'","'F9900001'");
+  await assert.rejects(db.exec(sql("'Outra Pessoa'")),/não confere/);await db.exec('rollback');
+  assert.equal((await db.query('select role from public.cop_profiles where id=$1',[viewer])).rows[0].role,'viewer');
+  await db.query('update public.cop_profiles set active=false where id=$1',[viewer]);
+  await assert.rejects(db.exec(sql("'Analista Sintético'")),/inativa/);await db.exec('rollback');
+  await db.query('update public.cop_profiles set active=true where id=$1',[viewer]);
+  await db.exec(sql("'Analista Sintético'"));await db.exec(sql("'Analista Sintético'"));
+  assert.equal((await db.query('select role from public.cop_profiles where id=$1',[viewer])).rows[0].role,'admin');
+  assert.equal((await db.query("select count(*) from public.cop_user_audit where target=$1 and event='promote_admin'",[viewer])).rows[0].count,1);
+  await db.query("update public.cop_profiles set role='viewer' where id=$1",[viewer]);
+ });
  await t.test('restauração de snapshot antigo sem ocorrência continua compatível',async()=>{
   await as('authenticated',admin,adminSession);
   await publish([contact('ES','Gestor legado')]);

@@ -1,7 +1,8 @@
 import {CLUSTERS,normalizeText,normalizePhone,whatsappUrl,parseCsv,filterContacts,importPreview,isCurrentValidity,topologyValues,consultationContacts} from './core.mjs';
 import {parseWorkbook} from './workbook.mjs';
 import {store} from './store.mjs';
-import {parseRoster} from './users.mjs';
+import {parseRoster,normalizeLogin} from './users.mjs';
+import {reportDialog,reviewDialog,reportsPage} from './contact-reports.mjs';
 import {dialUrl,operationalNotes,shareContact,contactShareText} from './contact-actions.mjs';
 import {createSessionRecovery} from './session-lifecycle.mjs';
 import {setupPwa} from './pwa.mjs';
@@ -12,6 +13,7 @@ const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')
 if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 const iconPaths={
+ whatsapp:'<path d="M20 11.5a8.5 8.5 0 0 1-12.6 7.4L3 20l1.1-4.2A8.5 8.5 0 1 1 20 11.5Z"/><path d="M8 7.5h1.5l1 2-1 1a8 8 0 0 0 3 3l1-1 2 1V15c0 .8-.8 1.2-1.6 1A11.7 11.7 0 0 1 7 9.1c-.2-.8.2-1.6 1-1.6Z"/>',
  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
  lock:'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
  moon:'<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>',
@@ -44,7 +46,7 @@ const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))|
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
 const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 state.connection=navigator.onLine===false?'unavailable':'online';
-state.shareMode='auto';state.sharePending=false;
+state.shareMode='auto';state.sharePending=false;state.reports=[];state.reportsLoading=false;state.reportsError='';state.reportFilter='open';state.reportDraft=null;state.reviewDraft=null;state.reportPending=false;state.modalReturn=null;
 const mobile=()=>matchMedia('(max-width: 760px)').matches;
 const toast=(message,kind='info')=>{
  state.notice={message,kind};
@@ -56,7 +58,7 @@ function navButton(page,title,iconName){
   return '<button type="button" class="nav-link '+(state.view===page?'active':'')+'" '+(state.view===page?'aria-current="page"':'')+' data-action="nav" data-page="'+page+'">'+ic(iconName)+'<span>'+title+'</span></button>';
 }
 function topTitle(){
-  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',usuarios:'Gestão de usuários'})[state.view]||'Central COP';
+  return ({consultar:'Consulta de escalonamentos',diretorio:'Diretório de contatos',favoritos:'Meus favoritos',recentes:'Consultas recentes',administracao:'Administração',importar:'Importação de planilhas',usuarios:'Gestão de usuários',alteracoes:'Atualizações de contatos'})[state.view]||'Central COP';
 }
 function uiHeader(){
  const stamp=state.contacts.map(c=>c.updated_at||'').filter(Boolean).sort().at(-1);
@@ -70,11 +72,11 @@ function themeButton(){
  return '<button type="button" class="nav-link theme-toggle" data-action="theme" aria-pressed="'+dark+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon')+'<span>Tema '+(dark?'claro':'escuro')+'</span></button>';
 }
 function renderShell(){
- const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+
+ const nav=navButton('consultar','Consultar','search')+navButton('diretorio','Diretório de contatos','users')+navButton('favoritos','Favoritos','star')+navButton('recentes','Recentes','clock')+navButton('alteracoes','Atualizações','edit')+
  '<div class="nav-divider"></div>'+themeButton()+
  (userIsAdmin()?'<div class="nav-divider"></div>'+navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'');
  return '<div class="layout"><aside class="sidebar"><div class="sidebar-brand"><div class="logo">'+brandIcon(48)+'</div><div><strong>Central COP</strong><small>OPERAÇÃO DE REDE</small></div></div><div class="nav-caption">NAVEGAÇÃO</div><nav aria-label="Menu principal">'+nav+'<button class="nav-link mobile-only" data-action="mobile-menu" aria-expanded="'+Boolean(state.mobileMenu)+'">'+ic('settings')+'<span>Mais</span></button></nav><div class="sidebar-foot">'+ic('info')+'<span>Ambiente interno<small>Central de Operações</small></span></div></aside><div class="main-area">'+uiHeader()+'<main class="content">'+(store.demo?'<div class="demo-banner">'+ic('alert')+' '+DEMO_BANNER+'</div>':'')+'<div class="section-top"><div><p class="overline">CENTRAL DE CONSULTA</p><h2>'+h(topTitle())+'</h2></div><span class="muted-caption">'+state.contacts.filter(c=>c.active!==false).length+' contato(s) ativo(s)</span></div>'+renderPage()+'</main></div></div>'+
- (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+themeButton()+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
+ (state.mobileMenu?'<section class="mobile-more mobile-only" aria-label="Mais opções">'+themeButton()+navButton('alteracoes','Atualizações','edit')+(userIsAdmin()?navButton('administracao','Administração','settings')+navButton('importar','Importar planilha','upload')+navButton('usuarios','Usuários e senhas','users'):'')+(store.configured?'<button class="btn subtle" data-action="change-password">Alterar senha</button>':'')+'<button class="btn subtle" data-action="mobile-menu">Fechar menu</button></section>':'')+
  (state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'')+(state.modal?renderModal():'');
 }
 function clusterBar(){
@@ -111,12 +113,13 @@ function contactCard(c){
  return '<article class="contact-card"><div class="level-block level-'+h(String(c.nivel||'other').match(/\d/)?.[0]||'other')+'"><strong>'+(c.nivel?'Nível '+h(c.nivel):'Sem nível')+'</strong></div>'+
   '<div class="contact-person"><div class="person-avatar">'+ic('users',22)+'</div><div class="person-details"><h3>'+h(c.full_name)+'</h3>'+(c.cargo?'<div class="role">'+h(c.cargo)+'</div>':'')+(place?'<div class="dim">'+h(place)+'</div>':'')+'<div class="tags">'+(c.topologia?'<span class="tag">'+h(c.topologia)+'</span>':'')+(!valid?'<span class="tag warn">Fora da vigência informada</span>':'')+(c.active===false?'<span class="tag warn">Inativo</span>':'')+'</div></div></div>'+
   '<div class="contact-meta">'+phone+(notes?'<div class="notes">'+ic('info',14)+' '+h(notes)+'</div>':'')+'</div>'+
-  '<div class="contact-actions">'+(enabled?'<a class="btn primary dial-action mobile-only" href="'+dial+'">'+ic('phone',17)+' Ligar</a>':'<button class="btn primary dial-action mobile-only" disabled>'+ic('phone',17)+' Ligar</button>')+
-  '<button class="btn whatsapp" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
+  '<div class="contact-actions"><div class="mobile-primary-actions mobile-only">'+(enabled?'<a class="btn primary dial-action" href="'+dial+'">'+ic('phone',21)+'<span>Ligar</span></a>':'<button class="btn primary dial-action" disabled>'+ic('phone',21)+'<span>Ligar</span></button>')+'<button class="btn whatsapp" '+(!enabled?'disabled':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('whatsapp',22)+'<span>WhatsApp</span></button></div>'+
+  '<button class="btn whatsapp desktop-only" '+(!enabled?'disabled title="Telefone inválido ou demonstração"':'data-action="whatsapp" data-id="'+h(c.id)+'"')+'>'+ic('phone',16)+' WhatsApp</button>'+
   '<button class="btn subtle share-action mobile-only" data-action="share" data-id="'+h(c.id)+'" '+(store.demo||state.sharePending?'disabled':'')+'>'+ic('share',17)+' '+(state.shareMode==='copy'?'Copiar informações':typeof navigator.share==='function'?'Compartilhar':'Compartilhar / copiar')+'</button>'+
   '<button class="btn subtle desktop-only" data-action="copy" data-id="'+h(c.id)+'">'+ic('copy',15)+' Copiar</button>'+
   '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+
   '<button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" aria-pressed="'+isFav+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',19)+'</button>'+
+  '<button class="btn subtle report-contact '+(userIsAdmin()?'':'wide')+'" data-action="report" data-id="'+h(c.id)+'" '+(store.demo?'disabled':'')+'>'+ic('edit',15)+' Informar alteração</button>'+
   (userIsAdmin()?'<button class="icon-btn edit-contact" data-action="edit" data-id="'+h(c.id)+'" title="Editar contato">'+ic('edit')+'</button>':'')+'</div></article>';
 }
 function contactList(list){
@@ -195,8 +198,10 @@ function initialSetupView(){
 function passwordChangeView(){
  return '<div class="auth-screen"><div class="auth-card"><div class="auth-logo official-logo">'+brandIcon(72)+'</div><span class="overline">SENHA PESSOAL</span><h1>Altere sua senha</h1><p>Informe a senha atual e escolha uma nova senha pessoal. No primeiro acesso, esta troca é obrigatória.</p><form id="changePasswordForm"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required/></label><label>Nova senha pessoal (mínimo 12 caracteres)<input name="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a nova senha<input name="confirmation" type="password" minlength="12" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>'+(state.busy?'Atualizando...':'Alterar senha e entrar')+'</button></form><button class="btn subtle" data-action="logout">Sair da conta</button></div></div>';
 }
-function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage})[state.view]?.()||consultation();}
+function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage,alteracoes:()=>reportsPage({reports:state.reports,accounts:state.accounts,admin:userIsAdmin(),loading:state.reportsLoading,error:state.reportsError,filter:state.reportFilter})})[state.view]?.()||consultation();}
 function renderModal(){
+ if(state.modal?.startsWith('report:')){const c=state.contacts.find(c=>c.id===state.modal.slice(7));return c?reportDialog(c,state.reportDraft?.id===c.id?state.reportDraft:{},state.reportPending):'';}
+ if(state.modal?.startsWith('review:')){const r=state.reports.find(r=>r.id===state.modal.slice(7));return userIsAdmin()&&r?reviewDialog(r,state.reviewDraft?.id===r.id?state.reviewDraft:{},state.reportPending):'';}
  const c=state.modal==='new'?{}:state.contacts.find(item=>item.id===state.modal)||{};
  const textInput=(name,label,val,required='')=>'<label class="field"><span>'+label+'</span><input name="'+name+'" value="'+h(val||'')+'" '+required+'/></label>';
  const select=(name,label,values,current)=>'<label class="field"><span>'+label+'</span><select name="'+name+'">'+values.map(v=>'<option '+(v===current?'selected':'')+'>'+h(v)+'</option>').join('')+'</select></label>';
@@ -204,7 +209,7 @@ function renderModal(){
 }
 function loginView(){
  const dark=document.documentElement.dataset.theme==='dark';
- return '<div class="login-screen"><div class="login-layout"><aside class="login-story" aria-label="Central COP — Escalonamentos"><div class="login-brand">'+brandIcon(64)+'<div><strong>Central COP</strong><span>ESCALONAMENTOS</span></div></div><div class="login-story-copy"><span class="login-eyebrow">CENTRAL DE OPERAÇÕES</span><h2>Gestão de escalonamentos<br>operacionais.</h2><p>Encontre os responsáveis por região, localidade e nível de atendimento.</p><div class="login-capabilities"><span>'+ic('map',16)+' Regiões</span><span>'+ic('users',16)+' Responsáveis</span><span>'+ic('phone',16)+' Contatos</span></div></div><div class="login-story-footer"><span class="login-status-dot"></span>Portal interno · Equipe COP</div></aside><section class="login-main" aria-labelledby="login-title"><header class="login-main-top"><span>ACESSO AO PORTAL</span><button type="button" class="login-theme" data-action="theme" aria-pressed="'+dark+'" aria-label="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon',19)+'</button></header><div class="login-form-wrap"><div class="login-mobile-brand">'+brandIcon(56)+'<strong>Central COP<span>ESCALONAMENTOS</span></strong></div><span class="overline">BEM-VINDO À CENTRAL COP</span><h1 id="login-title">Entre na sua conta</h1><p class="login-lead">Acesse o diretório de contatos e escalonamentos da sua operação.</p><form id="loginForm" aria-busy="'+Boolean(state.loginPending)+'"><label for="login-user">Matrícula ou e-mail</label><div class="login-input">'+ic('users',18)+'<input id="login-user" type="text" name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Sua matrícula ou e-mail" /></div><div class="login-password-heading"><label for="login-password">Senha</label><span>Seu acesso pessoal</span></div><div class="login-input">'+ic('lock',18)+'<input id="login-password" type="password" name="password" required autocomplete="current-password" placeholder="Digite sua senha" /><button type="button" class="password-toggle" data-action="toggle-password" aria-controls="login-password" aria-label="Mostrar senha" aria-pressed="false">'+ic('eye',19)+'</button></div><button class="btn primary login-submit" type="submit" '+(state.loginPending?'disabled':'')+'><span>'+(state.loginPending?'Entrando…':'Entrar no portal')+'</span>'+ic('chevron',18)+'</button></form><div class="login-access-note">'+ic('info',18)+'<p><strong>Precisa de acesso?</strong><br>Solicite seu cadastro ao administrador do portal.</p></div></div><footer class="login-footer">'+ic('lock',14)+' Acesso exclusivo para usuários autorizados</footer></section></div></div>';
+ return '<div class="login-screen"><div class="login-layout"><aside class="login-story" aria-label="Central COP — Escalonamentos"><div class="login-brand">'+brandIcon(64)+'<div><strong>Central COP</strong><span>ESCALONAMENTOS</span></div></div><div class="login-story-copy"><span class="login-eyebrow">CENTRAL DE OPERAÇÕES</span><h2>Gestão de escalonamentos<br>operacionais.</h2><p>Encontre os responsáveis por região, localidade e nível de atendimento.</p><div class="login-capabilities"><span>'+ic('map',16)+' Regiões</span><span>'+ic('users',16)+' Responsáveis</span><span>'+ic('phone',16)+' Contatos</span></div></div><div class="login-story-footer"><span class="login-status-dot"></span>Portal interno · Equipe COP</div></aside><section class="login-main" aria-labelledby="login-title"><header class="login-main-top"><span>ACESSO AO PORTAL</span><button type="button" class="login-theme" data-action="theme" aria-pressed="'+dark+'" aria-label="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon',19)+'</button></header><div class="login-form-wrap"><div class="login-mobile-brand">'+brandIcon(56)+'<strong>Central COP<span>ESCALONAMENTOS</span></strong></div><span class="overline">BEM-VINDO À CENTRAL COP</span><h1 id="login-title">Entre na sua conta</h1><p class="login-lead">Acesse o diretório de contatos e escalonamentos da sua operação.</p><form id="loginForm" aria-busy="'+Boolean(state.loginPending)+'"><label for="login-user">Matrícula ou e-mail</label><div class="login-input">'+ic('users',18)+'<input id="login-user" type="text" name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Sua matrícula ou e-mail" /></div><small class="login-id-hint">A matrícula aceita maiúsculas e minúsculas.</small><div class="login-password-heading"><label for="login-password">Senha</label><span>Seu acesso pessoal</span></div><div class="login-input">'+ic('lock',18)+'<input id="login-password" type="password" name="password" required autocomplete="current-password" placeholder="Digite sua senha" /><button type="button" class="password-toggle" data-action="toggle-password" aria-controls="login-password" aria-label="Mostrar senha" aria-pressed="false">'+ic('eye',19)+'</button></div><button class="btn primary login-submit" type="submit" '+(state.loginPending?'disabled':'')+'><span>'+(state.loginPending?'Entrando…':'Entrar no portal')+'</span>'+ic('chevron',18)+'</button></form><div class="login-access-note">'+ic('info',18)+'<p><strong>Precisa de acesso?</strong><br>Solicite seu cadastro ao administrador do portal.</p></div></div><footer class="login-footer">'+ic('lock',14)+' Acesso exclusivo para usuários autorizados</footer></section></div></div>';
 }
 function clearPrivateState(){
  state.shareMode='auto';state.sharePending=false;
@@ -222,6 +227,10 @@ function rememberConsultation(){
  try{sessionStorage.setItem('cop-consultation:'+state.user.id,JSON.stringify({view:['consultar','diretorio','favoritos','recentes'].includes(state.view)?state.view:'consultar',filters:state.filters}));}catch{}
 }
 function captureDraft(){
+ const report=document.querySelector('#reportForm');
+ if(report)state.reportDraft={id:report.dataset.id,reason:report.elements.reason.value,message:report.elements.message.value};
+ const review=document.querySelector('#reportReviewForm');
+ if(review)state.reviewDraft={id:review.dataset.id,note:review.elements.note.value};
  const query=document.querySelector('#mainSearch,#directorySearch');if(query)state.filters.query=query.value;
  const roster=document.querySelector('#rosterText');if(roster)state.rosterRaw=roster.value;
  const form=document.querySelector('#contactForm');
@@ -232,6 +241,19 @@ function restoreDraft(){
  const draft=state.contactDraft,form=document.querySelector('#contactForm');
  if(!form||!userIsAdmin()||draft?.id!==state.modal)return;
  for(const item of draft.fields){const field=form.elements.namedItem(item.name);if(field){if(item.type==='checkbox')field.checked=item.checked;else field.value=item.value;}}
+}
+async function loadReports(){
+ if(state.reportsLoading)return;
+ const epoch=state.sessionEpoch||0;
+ state.reportsLoading=true;state.reportsError='';render();
+ try{const rows=await store.reports();if(epoch===(state.sessionEpoch||0))state.reports=rows;}
+ catch(error){if(epoch===(state.sessionEpoch||0)){state.reports=[];state.reportsError='Não foi possível carregar as informações. Tente atualizar a lista.';}}
+ finally{if(epoch===(state.sessionEpoch||0)){state.reportsLoading=false;render();}}
+}
+function closeReportModal(){
+ const target=state.modalReturn;
+ state.modal=null;state.reportDraft=null;state.reviewDraft=null;state.modalReturn=null;render();
+ if(target)Array.from(root.querySelectorAll('button[data-action]')).find(b=>b.dataset.action===target.action&&b.dataset.id===target.id)?.focus();
 }
 function restoreConsultation(){
  try{
@@ -287,6 +309,21 @@ function copyText(text) {
  document.execCommand('copy');el.remove();return Promise.resolve();
 }
 root.addEventListener('submit',async e=>{
+ if(e.target.id==='reportForm'||e.target.id==='reportReviewForm'){
+  e.preventDefault();if(store.demo||state.reportPending)return;
+  const review=e.target.id==='reportReviewForm';if(review&&!userIsAdmin())return;
+  const form=new FormData(e.target),id=e.target.dataset.id,epoch=state.sessionEpoch||0;
+  captureDraft();state.reportPending=true;render();
+  try{
+   if(review)await store.reviewContactReport(id,String(form.get('note')||''));
+   else await store.submitContactReport(id,String(form.get('reason')),String(form.get('message')||''));
+   if(epoch!==(state.sessionEpoch||0))return;
+   closeReportModal();toast(review?'Análise concluída.':'Informação enviada para análise.','success');
+   if(state.view==='alteracoes')await loadReports();
+  }catch(error){if(epoch===(state.sessionEpoch||0))toast(error.message||'Não foi possível enviar. Tente novamente.','error');}
+  finally{if(epoch===(state.sessionEpoch||0)){state.reportPending=false;if(state.modal)render();}}
+  return;
+ }
  if(e.target.id==='importPreviewFilter'){e.preventDefault();if(state.upload){state.upload.previewQuery=String(new FormData(e.target).get('previewQuery')||'');render();}return;}
  if(e.target.id==='initialSetupForm'){
   e.preventDefault();if(state.busy)return;
@@ -360,6 +397,8 @@ root.addEventListener('submit',async e=>{
 });
 root.addEventListener('change',async e=>{
  const el=e.target;
+ if(el.id==='login-user'){if(!el.value.includes('@'))el.value=normalizeLogin(el.value);return;}
+ if(el.matches('[data-report-filter]')){state.reportFilter=el.value;render();return;}
  if(el.id==='usersImportFile'){
   if(!userIsAdmin()||state.busy)return;
   const file=el.files?.[0];if(!file)return;
@@ -420,6 +459,19 @@ root.addEventListener('click',async e=>{
  }
  if(action==='retry-session'){await recoverSession({reload:true});return;}
  if(state.connection!=='online')return;
+ if(action==='reports-refresh'){await loadReports();return;}
+ if(action==='report'){
+  if(store.demo||!state.contacts.some(c=>c.id===btn.dataset.id))return;
+  state.modalReturn={action,id:btn.dataset.id};state.reportDraft=null;state.modal='report:'+btn.dataset.id;render();root.querySelector('#reportForm select')?.focus();return;
+ }
+ if(action==='report-review'){
+  if(!userIsAdmin()||!state.reports.some(r=>r.id===btn.dataset.id&&r.status==='open'))return;
+  state.modalReturn={action,id:btn.dataset.id};state.reviewDraft=null;state.modal='review:'+btn.dataset.id;render();root.querySelector('#reportReviewForm textarea')?.focus();return;
+ }
+ if(action==='report-edit'){
+  if(!userIsAdmin()||!state.contacts.some(c=>c.id===btn.dataset.id))return;
+  state.modal=btn.dataset.id;render();root.querySelector('#contactForm input')?.focus();return;
+ }
  if(action==='mobile-menu'){state.mobileMenu=!state.mobileMenu;render();return;}
  if(action==='change-password'){state.credentials=[];state.view='senha';render();return;}
  if(action==='nav'){
@@ -427,7 +479,7 @@ root.addEventListener('click',async e=>{
   if(state.view==='usuarios'&&btn.dataset.page!=='usuarios'){
     state.credentials=[];state.roster=null;state.rosterRaw='';
   }
-  state.view=btn.dataset.page;render();return;
+  state.view=btn.dataset.page;render();if(state.view==='alteracoes')await loadReports();return;
  }
  if(action==='load-pending-roster'){
   if(!userIsAdmin()||state.busy)return;
@@ -517,7 +569,7 @@ root.addEventListener('click',async e=>{
  }
  if(action==='whatsapp'){const c=state.contacts.find(x=>x.id===btn.dataset.id);if(c&&!store.demo&&whatsappUrl(c))window.open(whatsappUrl(c),'_blank','noopener,noreferrer');return;}
  if(action==='new'||action==='edit'){if(!userIsAdmin())return;state.modal=action==='new'?'new':btn.dataset.id;render();return;}
- if(action==='close-modal'){if(e.target!==btn&&e.target.classList.contains('modal-card'))return;state.modal=null;render();return;}
+ if(action==='close-modal'){if(state.reportPending)return;if(state.modal?.startsWith('report:')||state.modal?.startsWith('review:')){closeReportModal();return;}if(e.target!==btn&&e.target.classList.contains('modal-card'))return;state.modal=null;render();return;}
  if(action==='logout'){
   state.signingOut=true;
   clearPrivateState();state.connection='online';render();
@@ -541,6 +593,15 @@ root.addEventListener('click',async e=>{
   catch(err){toast('Falha na restauração: '+err.message,'error');}finally{state.busy=false;}return;
  }
 });
+root.addEventListener('keydown',event=>{
+ if(!state.modal?.startsWith('report:')&&!state.modal?.startsWith('review:'))return;
+ if(event.key==='Escape'&&!state.reportPending){event.preventDefault();closeReportModal();return;}
+ if(event.key!=='Tab')return;
+ const fields=Array.from(root.querySelectorAll('.report-dialog button:not(:disabled),.report-dialog input,.report-dialog select,.report-dialog textarea'));
+ const first=fields[0],last=fields.at(-1);
+ if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+ else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+});
 const recoverSession=createSessionRecovery({
  session:()=>state.signingOut?Promise.resolve(null):store.demo?Promise.resolve({id:'demo',role:'viewer',active:true}):store.session(),
  epoch:()=>state.sessionEpoch||0,
@@ -551,7 +612,7 @@ const recoverSession=createSessionRecovery({
  verified:async(user,{reload})=>{
   const changed=state.user?.id!==user.id,roleChanged=state.user?.role!==user.role;
   const needsData=reload||changed||roleChanged||state.connection!=='online';
-  if(roleChanged&&state.user){state.contacts=[];state.accounts=[];state.pendingRoster=[];state.credentials=[];state.upload=null;state.modal=null;state.batches=[];state.audit=[];state.view='consultar';}
+  if(roleChanged&&state.user){state.sessionEpoch=(state.sessionEpoch||0)+1;state.contacts=[];state.accounts=[];state.pendingRoster=[];state.credentials=[];state.upload=null;state.modal=null;state.batches=[];state.audit=[];state.reports=[];state.reportsLoading=false;state.reportsError='';state.reportPending=false;state.reportDraft=null;state.reviewDraft=null;state.modalReturn=null;state.sharePending=false;state.view='consultar';}
   if(!store.demo)state.user=user;
   if(changed){loadPreferences();if(!store.demo)restoreConsultation();}
   if(needsData)await refresh();

@@ -29,6 +29,17 @@ test('falha de rede após senha aceita é identificada como validação de sess�
  })});
  await assert.rejects(store.signIn('F9900001','synthetic'),error=>error.stage==='session'&&error.message.includes('senha foi aceita'));
 });
+
+test('matrícula aceita todas as caixas e preserva a senha exatamente como digitada',async()=>{
+ const calls=[];
+ const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:()=>({
+  auth:{signInWithPassword:async args=>{calls.push(args);return {error:{status:400}};}}
+ })});
+ for(const login of ['F9900042','f9900042',' F9900042 ','f9900042'])await assert.rejects(store.signIn(login,' SenhaMix123! '));
+ assert.ok(calls.every(c=>c.email==='f9900042@users.central-cop.invalid'&&c.password===' SenhaMix123! '));
+ await assert.rejects(store.signIn(' Admin@Example.invalid ','SenhaMix123!'));
+ assert.equal(calls.at(-1).email,'admin@example.invalid');
+});
 test('recupera e renova sessão pelo SDK antes de validar usuário e backend',async()=>{
  const order=[];
  const store=await load({supabaseUrl:'https://example.invalid',supabaseAnonKey:'public'},{createClient:(_u,_k,options)=>{
