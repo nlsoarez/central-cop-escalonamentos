@@ -188,7 +188,7 @@ function usersPage(){
  (users.length?users.map(u=>'<tr><td><strong>'+h(u.login_id)+'</strong></td><td>'+h(u.display_name)+'</td><td>'+h(u.role)+'</td><td><span class="tag '+(u.active?'blue':'warn')+'">'+(u.active?'Ativo':'Inativo')+'</span></td><td>'+ (u.must_change_password?'Troca pendente':'Pessoal')+'</td><td><button class="btn subtle" data-action="reset-account" data-id="'+h(u.id)+'" '+(u.role!=='viewer'?'disabled':'')+'>Redefinir</button> <button class="btn subtle" data-action="toggle-account" data-id="'+h(u.id)+'" data-active="'+(u.active?'false':'true')+'" '+(u.role!=='viewer'?'disabled':'')+'>'+(u.active?'Desativar':'Ativar')+'</button></td></tr>').join(''):'<tr><td colspan="6">Nenhum usuário provisionado.</td></tr>')+'</tbody></table></div></div></div>';
 }
 function renderUserAudit(){
- const events={create:'Conta criada',reset:'Senha redefinida',activate:'Acesso reativado',deactivate:'Acesso bloqueado',change_password:'Senha pessoal alterada'};
+ const events={promote_admin:'Promoção a administrador',create:'Conta criada',reset:'Senha redefinida',activate:'Acesso reativado',deactivate:'Acesso bloqueado',change_password:'Senha pessoal alterada'};
  const identity=id=>state.accounts.find(u=>u.id===id)?.login_id||id;
  return '<h3 class="subheading">Histórico administrativo</h3><div class="panel"><div class="table-overflow"><table class="preview-table"><thead><tr><th>Data</th><th>Operador</th><th>Conta</th><th>Ação</th></tr></thead><tbody>'+(state.audit||[]).map(a=>'<tr><td>'+h(new Date(a.created_at).toLocaleString('pt-BR'))+'</td><td>'+h(identity(a.actor))+'</td><td>'+h(identity(a.target))+'</td><td>'+h(events[a.event]||a.event)+'</td></tr>').join('')+'</tbody></table></div></div>';
 }
