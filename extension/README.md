@@ -1,4 +1,6 @@
-# Central COP — Assistente MAX 0.2.0
+# Central COP — Assistente MAX 0.2.1
+
+A versão 0.2.1 coloca o telefone SVG ao lado do rótulo da regra e abre a escolha em menu flutuante. Não há alteração de permissões ou do fluxo de chamadas.
 
 Extensão local para Chrome/Edge, Manifest V3. Preserva a preparação de telefone no MAX e acrescenta um assistente opcional para o monitoramento. Não é uma integração oficial NICE e não realiza chamadas. A nova função inicia desativada e aguarda homologação no ambiente interno; o preenchimento legado já foi validado pelo usuário.
 

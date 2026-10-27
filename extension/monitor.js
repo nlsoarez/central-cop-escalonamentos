@@ -16,24 +16,36 @@
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
  const current=record=>record.row.isConnected&&enabled&&(()=>{try{return same(extract(record.row),record.context);}catch{return false;}})();
  function button(label,action){const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',event=>{if(event.isTrusted)action();});return b;}
- function message(record,value){record.status.textContent=value;}
+ function message(record,value){record.status.textContent=value;if(record.phone)record.phone.title=value+' — Preparar no MAX; não inicia ligação';}
+ function phoneIcon(){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  for(const [key,value]of Object.entries({viewBox:'0 0 24 24',width:'18',height:'18',fill:'none',stroke:'currentColor','stroke-width':'1.8','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d','M22 16.92v3a2 2 0 0 1-2.18 2A19.7 19.7 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.34 1.77.64 2.6a2 2 0 0 1-.45 2.12L8.09 9.64a16 16 0 0 0 6.27 6.27l1.2-1.2a2 2 0 0 1 2.12-.45c.83.3 1.7.52 2.6.64A2 2 0 0 1 22 16.92Z');
+  svg.append(path);return svg;
+ }
  function render(record,result){
-  record.box.replaceChildren();record.status=document.createElement('span');record.status.setAttribute('role','status');
-  const phone=button('☎',async()=>{
+  record.box.replaceChildren();record.status=document.createElement('span');record.status.className='status sr';record.status.setAttribute('role','status');
+  const phone=button('',async()=>{
    if(!current(record)){scan();return;}
    if(!result?.ok){await lookup(record);return;}
    if(result.candidates.length===1){await select(record,result.candidates[0]);return;}
    record.choices.hidden=!record.choices.hidden;
+   phone.setAttribute('aria-expanded',String(!record.choices.hidden));
+   if(!record.choices.hidden){for(const other of records.values())if(other!==record&&other.choices){other.choices.hidden=true;other.phone?.setAttribute('aria-expanded','false');}record.choices.querySelector('button')?.focus();}
   });
+  phone.className='phone';phone.append(phoneIcon());
   phone.setAttribute('aria-label','Preparar escalonamento no MAX');phone.title='Preparar telefone no MAX; não inicia ligação';record.phone=phone;
   record.box.append(phone,record.status);
   if(!result){phone.disabled=true;message(record,'Consultando…');return;}
   if(!result.ok||!result.candidates?.length){
+   record.status.className='status error';
    message(record,errors[result.code]||'Não foi possível consultar. Tente novamente.');
    if(['MISSING_CONTEXT','INVALID_LEVEL','MONITOR_DISABLED'].includes(result.code))phone.disabled=true;
    const cop=button('Consultar no Central COP',async()=>{try{await chrome.runtime.sendMessage({type:'COP_MONITOR_OPEN_COP'});}catch{message(record,errors.COP_UNAVAILABLE);}});record.box.append(cop);return;
   }
   message(record,result.candidates.length===1?result.candidates[0].name:result.candidates.length+' responsáveis — escolha');
+  if(result.candidates.length>1){phone.setAttribute('aria-expanded','false');const count=document.createElement('span');count.className='count';count.setAttribute('aria-hidden','true');count.textContent=String(result.candidates.length);phone.append(count);}
   record.choices=document.createElement('div');record.choices.className='choices';record.choices.hidden=true;record.choices.setAttribute('role','group');record.choices.setAttribute('aria-label','Responsáveis compatíveis');
   for(const candidate of result.candidates){
    const option=button(candidate.name,()=>select(record,candidate));
@@ -72,7 +84,7 @@
     if(previous&&same(previous.context,context)&&previous.error===error)continue;
     if(previous){previous.host.remove();records.delete(previous.key);}
     const host=document.createElement('span');host.className='cop-monitor-assistant';const shadow=host.attachShadow({mode:'open'});
-    const style=document.createElement('style');style.textContent=':host{display:block;margin-top:6px;text-align:left;font:12px system-ui;color:#242424}button{font:inherit;cursor:pointer;background:#fff;color:#b72019;border:1px solid #e8b7b3;border-radius:7px;padding:6px 9px;margin:3px}button:focus-visible{outline:3px solid #2267bb}button:disabled{opacity:.55;cursor:default}span[role=status]{display:inline-block;max-width:230px;vertical-align:middle}.choices{padding:6px;border:1px solid #ddd;border-radius:8px;background:#fff;max-height:260px;overflow:auto}.choices button{display:block;text-align:left;width:calc(100% - 6px);color:#202020}.choices small{display:block;color:#666;white-space:normal}';
+    const style=document.createElement('style');style.textContent=':host{display:inline-block;position:relative;margin-inline-start:8px;vertical-align:middle;text-align:left;font:12px system-ui;color:#242424}button{font:inherit;cursor:pointer;background:#fff;color:#c8241c;border:1px solid #edc2bf;border-radius:8px;padding:7px 10px}button:focus-visible{outline:3px solid #2267bb;outline-offset:2px}button:disabled{opacity:.45;cursor:default}.phone{position:relative;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:7px;vertical-align:middle;box-shadow:0 1px 3px #8c1b1710}.phone:hover:not(:disabled){background:#c8241c;color:#fff;border-color:#c8241c}.phone svg{display:block;flex-shrink:0}.count{position:absolute;right:-5px;top:-5px;background:#c8241c;color:#fff;border:2px solid #fff;border-radius:12px;min-width:14px;height:14px;padding:0 2px;font-size:10px;line-height:14px;text-align:center}.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.status.error{display:inline-block;max-width:200px;vertical-align:middle;margin:0 6px;color:#8b2420}.choices{position:absolute;z-index:1000;top:calc(100% + 8px);right:0;width:320px;max-width:72vw;padding:8px;border:1px solid #e8d8d6;border-radius:12px;background:#fff;box-shadow:0 10px 32px #29202024;max-height:260px;overflow:auto}.choices[hidden]{display:none}.choices button{display:block;text-align:left;width:100%;color:#202020;margin:0 0 6px}.choices button:last-child{margin-bottom:0}.choices button:hover{background:#fff4f3}.choices small{display:block;color:#666;white-space:normal;margin-top:4px;line-height:1.45}';
     const box=document.createElement('div');shadow.append(style,box);row.cells[map.rule].append(host);
     const record={row,context,error,host,box,key:crypto.randomUUID()};records.set(record.key,record);byRow.set(row,record);
     if(error)render(record,{ok:false,code:error});else{render(record,null);queue=queue.then(()=>lookup(record)).catch(()=>{});}
@@ -85,6 +97,8 @@
   const record=records.get(message.rowKey);respond({valid:!!record&&current(record)&&same(record.context,message.context)});
  });
  chrome.storage.local.get('monitorEnabled').then(settings=>{enabled=settings.monitorEnabled===true;scan();});
+ document.addEventListener('click',event=>{for(const record of records.values())if(record.choices&&!event.composedPath().includes(record.host)){record.choices.hidden=true;record.phone?.setAttribute('aria-expanded','false');}});
+ document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;for(const record of records.values())if(record.choices&&!record.choices.hidden){record.choices.hidden=true;record.phone?.setAttribute('aria-expanded','false');if(document.activeElement===record.host)record.phone?.focus();}});
  chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.monitorEnabled){enabled=changes.monitorEnabled.newValue===true;scan();}});
  new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(scan,150);}).observe(document.body,{childList:true,subtree:true,characterData:true});
 })();
