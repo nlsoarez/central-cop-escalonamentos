@@ -45,3 +45,7 @@ A autenticação SMTP foi validada localmente e dentro do Edge Runtime real usan
 Backup criptografado anterior: `20261027T032250Z`. Estado privado da implantação: `.state/first-access-20261027-a4cfad55` na VPS. Os 58 vínculos conferiram com nomes e matrículas do roster e dos perfis. Nenhuma conta nova foi necessária. Somente `N4014011` teve senha descartada, troca pendente e sessões revogadas (zero sessões restantes). Digests confirmaram preservação dos demais perfis, hashes de senha e 1.841 contatos.
 
 Validação pública no backend: matrícula fictícia retorna confirmação genérica; leitura anônima das tabelas privadas retorna 401; checagem SMTP com chave pública retorna 403. Nenhum token de ativação real foi emitido durante essas verificações e não houve envio de lote aos analistas.
+
+Publicação Vercel `dpl_CXpN1t3Q9ZoPNT4bteNkBuiwfcAV` pronta em produção, código `6a59d01de18305e8b4b3f5f04ec900f451311a44`. Configuração pública habilitada, hashes de app/store/service worker conferidos e preflight HTTPS 204. Navegador confirmou botão e formulário públicos sem solicitar e-mail real. O proprietário confirmou recebimento do único e-mail de teste na própria conta; a entrega de links em caixas corporativas ainda depende da primeira solicitação de um analista.
+
+A chave SSH temporária foi removida e as quatro chaves originais foram comparadas e preservadas. Par de chaves local descartado. Apenas functions e gateway do Central COP foram recriados; Auth, REST, banco e serviços externos não foram reiniciados.
