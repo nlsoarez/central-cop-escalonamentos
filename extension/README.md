@@ -1,6 +1,16 @@
-# Central COP — Assistente MAX 0.1.6
+# Central COP — Assistente MAX 0.2.0
 
-Extensão local para Chrome/Edge, Manifest V3. Protótipo com testes automatizados. A versão 0.1.0 foi instalada pelo usuário e os botões apareceram no portal, mas a comunicação com o MAX falhou mesmo após reabertura da janela. A versão 0.1.1 acrescenta diagnóstico por etapa e indicador visível de carregamento no MAX; precisa ser recarregada no gerenciador de extensões. Preenchimento real ainda não validado. Não é uma integração oficial NICE e não realiza chamadas.
+Extensão local para Chrome/Edge, Manifest V3. Preserva a preparação de telefone no MAX e acrescenta um assistente opcional para o monitoramento. Não é uma integração oficial NICE e não realiza chamadas. A nova função inicia desativada e aguarda homologação no ambiente interno; o preenchimento legado já foi validado pelo usuário.
+
+## Novo assistente do monitoramento
+
+Nas Opções da extensão, marque **Ativar assistente no monitoramento** e recarregue a página interna autorizada. Mantenha uma única aba autenticada do Central COP e uma única sessão MAX no mesmo perfil do Chrome. A versão 0.2.0 precisa ser recarregada no gerenciador de extensões; o Chrome pode solicitar confirmação das novas permissões.
+
+O botão de telefone aparece junto às regras de Escalonamento N1/N2/N3 e usa Grupo, Cidade/UF e Tecnologia. Um responsável pode ser preparado pelo clique; múltiplos abrem opções. A abrangência de cada contato precisa ter sido confirmada pelo administrador no Central COP. Cidade/UF ausente, grupo desconhecido ou nenhum contato compatível impedem envio. O contato e a linha são conferidos novamente antes da preparação. O clique final em Chamada continua manual.
+
+Permissões adicionais: localizar a aba do Central COP, executar o script apenas na página `http://10.29.5.216/portal/pages/ui_monitoramento.php` e salvar a preferência booleana de ativação. Nenhum contato ou sessão é persistido pela extensão. Não lê cookies, senhas nem tokens. Desativar a opção remove os novos controles e preserva os botões MAX do portal.
+
+Detalhes de configuração, limites e homologação: [documentação do assistente](../docs/ASSISTENTE-MONITORAMENTO.md).
 
 ## Instalação no Chrome
 
@@ -26,9 +36,9 @@ O telefone pendente expira em até 60 segundos. **Fechar** cancela a preparaçã
 
 - Script do portal: apenas `https://central-cop-escalonamentos.vercel.app/*`.
 - Script do MAX: apenas `https://max.niceincontact.com/index.html`, janela principal.
-- Permissão de host: somente `https://max.niceincontact.com/*`, para localizar a janela MAX e enviar a preparação. Não solicita acesso a todos os sites nem permissão geral de histórico/abas.
+- Permissões de host: MAX e Central COP, para localizar as abas autorizadas. O script adicional fica restrito à página interna descrita acima. Não solicita acesso a todos os sites nem permissão geral de histórico/abas.
 - Lê o telefone do link WhatsApp do cartão somente para preparar a ação; transfere apenas número e horário entre componentes locais da extensão. A agenda não é copiada em lote.
-- Sem leitura de cookies, tokens, senhas, armazenamento da sessão ou chamadas à API NICE. Sem armazenamento persistente, telemetria ou servidor próprio.
+- Sem leitura de cookies, tokens, senhas, armazenamento da sessão ou chamadas à API NICE. Somente a preferência de ativação é persistida; sem contatos em armazenamento local, telemetria ou servidor adicional.
 - Mensagens externas de sites/extensões não são expostas. O worker valida extensão de origem, domínio e frame do portal.
 - Erros genéricos não incluem dados de sessão. Nenhum número é gravado em log.
 

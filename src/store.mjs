@@ -105,6 +105,16 @@ export const store={
     if(!client)return [];
     return expect(await client.from('cop_contact_reports').select('id,contact_id,contact_name,contact_cluster,contact_area,contact_city,reporter_id,reason,message,status,review_note,created_at,reviewed_at').order('status').order('created_at',{ascending:false}).limit(200));
   },
+  async lookupMonitoring(context,contactId,revision){
+    if(!client)throw Error('Consulta indisponível na demonstração.');
+    return expect(await client.rpc('cop_lookup_monitoring',{p_group:context.group,p_city:context.city,p_uf:context.uf,p_technology:context.technology,p_level:context.level,p_contact_id:contactId||null,p_revision:revision||null}));
+  },
+  async monitoringCoverage(contactId){
+    if(!client)throw Error('Configure o banco para confirmar abrangências.');
+    return expect(await client.from('cop_monitor_coverage').select('city,uf,technology').eq('contact_id',contactId).order('city'));
+  },
+  async setMonitoringCoverage(contactId,rows){return expect(await client.rpc('cop_set_monitor_coverage',{p_contact_id:contactId,p_rows:rows}));},
+  async setMonitoringGroup(alias,cluster,ufs){return expect(await client.rpc('cop_set_monitor_group',{p_alias:alias,p_cluster:cluster,p_ufs:ufs}));},
   async submitContactReport(contactId,reason,message){
     if(!client)throw Error('Relatos indisponíveis na demonstração.');
     return expect(await client.rpc('cop_submit_contact_report',{p_contact_id:contactId,p_reason:reason,p_message:message}));

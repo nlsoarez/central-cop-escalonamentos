@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const root = new URL('../extension/', import.meta.url);
-const files = Object.fromEntries(await Promise.all(['policy.js','background.js','portal.js','max.js','manifest.json'].map(async file => [file, await readFile(new URL(file, root), 'utf8')])));
+const files = Object.fromEntries(await Promise.all(['policy.js','background.js','portal.js','max.js','manifest.json','monitor-policy.js','monitor-background.js'].map(async file => [file, await readFile(new URL(file, root), 'utf8')])));
 function policy() { const scope = vm.createContext({URL}); vm.runInContext(files['policy.js'], scope); return scope.CopMaxPolicy; }
 const valid = (createdAt = Date.now()) => ({type: 'COP_PREPARE_MAX', phone: '+5511999990001', createdAt});
 const sender = {id:'extension-test', frameId:0, url:'https://central-cop-escalonamentos.vercel.app/', tab:{id:1}};
-test('extensão limita acesso aos dois sites, sem cookies, armazenamento ou execução remota', () => {
+test('extensão limita acesso aos sites autorizados e armazena somente a preferência do assistente', () => {
   const manifest = JSON.parse(files['manifest.json']);
   assert.equal(manifest.manifest_version, 3);
-  assert.deepEqual(manifest.host_permissions, ['https://max.niceincontact.com/*']);
-  assert.equal(manifest.permissions, undefined);
+  assert.deepEqual(manifest.host_permissions, ['https://max.niceincontact.com/*','https://central-cop-escalonamentos.vercel.app/*']);
+  assert.deepEqual(manifest.permissions, ['storage']);
   assert.equal(manifest.externally_connectable, undefined);
-  assert.deepEqual(manifest.content_scripts.flatMap(c=>c.matches), ['https://central-cop-escalonamentos.vercel.app/*','https://max.niceincontact.com/index.html']);
+  assert.deepEqual(manifest.content_scripts.flatMap(c=>c.matches), ['https://central-cop-escalonamentos.vercel.app/*','https://max.niceincontact.com/index.html','http://10.29.5.216/portal/pages/ui_monitoramento.php*']);
   assert.ok(manifest.content_scripts.every(c=>c.all_frames === false));
 });
 test('contrato rejeita fonte, frame, telefone e validade incorretos', () => {
@@ -34,7 +34,7 @@ test('campo de discagem deve ser único, visível, editável e vazio', () => {
 function background(tabs = [{id:2,windowId:3,url:'https://max.niceincontact.com/index.html'}], result = {ok:true}, failure = '') {
   let listener; const effects = [];
   const scope = vm.createContext({URL, Date, chrome:{runtime:{id:sender.id,onMessage:{addListener(fn){listener=fn;}}},tabs:{query:async()=>tabs,sendMessage:async(...args)=>{effects.push(['send',...args]);return result;},update:async(...args)=>effects.push(['tab',...args])},windows:{update:async(...args)=>effects.push(['window',...args])}}});
-  scope.importScripts = () => vm.runInContext(files['policy.js'],scope);
+  scope.importScripts = (...names) => names.forEach(name=>vm.runInContext(files[name],scope));
   if (failure === 'query') scope.chrome.tabs.query = async () => { throw Error('permission'); };
   if (failure === 'receiver') scope.chrome.tabs.sendMessage = async () => { throw Error('no receiver'); };
   if (failure === 'focus') scope.chrome.windows.update = async () => { throw Error('cannot focus'); };

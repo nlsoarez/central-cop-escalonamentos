@@ -1,7 +1,7 @@
 (() => {
   if (location.origin !== CopMaxPolicy.max || location.pathname !== '/index.html' || window.top !== window) return;
   const ready = document.createElement('div');
-  ready.textContent = 'Assistente COP ativo · 0.1.6';
+  ready.textContent = 'Assistente COP ativo · 0.2.0';
   ready.style.cssText = 'position:fixed;bottom:3px;right:4px;z-index:2147483646;font:11px Arial,sans-serif;background:#fff;color:#83170f;border:1px solid #da291c;padding:3px 6px;border-radius:4px;pointer-events:none';
   document.documentElement.append(ready);
   let current = null;

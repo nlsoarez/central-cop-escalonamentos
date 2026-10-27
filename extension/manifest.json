@@ -1,13 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Central COP — Assistente MAX",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "Envia um telefone selecionado no Central COP para conferência e preenchimento manual no MAX. Não inicia ligações.",
   "minimum_chrome_version": "120",
-  "host_permissions": ["https://max.niceincontact.com/*"],
+  "host_permissions": ["https://max.niceincontact.com/*", "https://central-cop-escalonamentos.vercel.app/*"],
+  "permissions": ["storage"],
+  "options_ui": {"page":"options.html","open_in_tab":true},
+  "action": {"default_title":"Configurar assistente do monitoramento"},
   "background": {"service_worker": "background.js"},
   "content_scripts": [
-    {"matches": ["https://central-cop-escalonamentos.vercel.app/*"], "js": ["policy.js", "portal.js"], "all_frames": false},
-    {"matches": ["https://max.niceincontact.com/index.html"], "js": ["policy.js", "max.js"], "all_frames": false}
+    {"matches": ["https://central-cop-escalonamentos.vercel.app/*"], "js": ["policy.js", "monitor-policy.js", "portal.js", "portal-monitor.js"], "all_frames": false},
+    {"matches": ["https://max.niceincontact.com/index.html"], "js": ["policy.js", "max.js"], "all_frames": false},
+    {"matches": ["http://10.29.5.216/portal/pages/ui_monitoramento.php*"], "js": ["monitor-policy.js", "monitor.js"], "all_frames": false}
   ]
 }

@@ -7,6 +7,8 @@ import {dialUrl,operationalNotes,shareContact,contactShareText} from './contact-
 import {createSessionRecovery} from './session-lifecycle.mjs';
 import {setupPwa} from './pwa.mjs';
 import {regionMap} from './region-maps.mjs';
+import {installMonitoringBridge,monitoringCoverageDialog,parseMonitoringCoverage} from './monitoring.mjs';
+installMonitoringBridge({store,window});
 
 const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
@@ -144,7 +146,7 @@ function contactCard(c){
   '<button class="btn max desktop-only" disabled title="Integração NICE MAX pendente de homologação">'+ic('phone',15)+' MAX</button>'+
   '<button class="icon-btn favorite '+(isFav?'selected':'')+'" data-action="favorite" data-id="'+h(c.id)+'" aria-pressed="'+isFav+'" title="'+(isFav?'Remover favorito':'Adicionar favorito')+'">'+ic('star',19)+'</button>'+
   '<button class="btn subtle report-contact '+(userIsAdmin()?'':'wide')+'" data-action="report" data-id="'+h(c.id)+'" '+(store.demo?'disabled':'')+'>'+ic('edit',15)+' Informar alteração</button>'+
-  (userIsAdmin()?'<button class="icon-btn edit-contact" data-action="edit" data-id="'+h(c.id)+'" title="Editar contato">'+ic('edit')+'</button>':'')+'</div></article>';
+  (userIsAdmin()?'<button class="icon-btn" title="Abrangência no monitoramento" aria-label="Abrangência no monitoramento" data-action="monitor-coverage" data-id="'+h(c.id)+'" '+(store.demo?'disabled':'')+'>'+ic('map',18)+'</button><button class="icon-btn edit-contact" data-action="edit" data-id="'+h(c.id)+'" title="Editar contato">'+ic('edit')+'</button>':'')+'</div></article>';
 }
 function contactList(list){
  if(!list.length)return '<div class="empty"><div class="empty-icon">'+ic('search',32)+'</div><h3>Nenhum contato encontrado</h3><p>Revise os filtros ou confirme se há contatos cadastrados nessa região.</p><button class="btn subtle" data-action="clear">Limpar filtros</button></div>';
@@ -228,6 +230,7 @@ function passwordChangeView(){
 }
 function renderPage(){return ({consultar:consultation,diretorio:directory,favoritos:favoritesPage,recentes:recentPage,administracao:adminPage,importar:importPage,usuarios:usersPage,alteracoes:()=>reportsPage({reports:state.reports,accounts:state.accounts,admin:userIsAdmin(),loading:state.reportsLoading,error:state.reportsError,filter:state.reportFilter})})[state.view]?.()||consultation();}
 function renderModal(){
+ if(state.modal?.startsWith('monitor:')){const c=state.contacts.find(c=>c.id===state.modal.slice(8));return userIsAdmin()&&c?monitoringCoverageDialog(c,state.monitorRows||[],state.monitorDraft??null,state.busy):'';}
  if(state.modal?.startsWith('report:')){const c=state.contacts.find(c=>c.id===state.modal.slice(7));return c?reportDialog(c,state.reportDraft?.id===c.id?state.reportDraft:{},state.reportPending):'';}
  if(state.modal?.startsWith('review:')){const r=state.reports.find(r=>r.id===state.modal.slice(7));return userIsAdmin()&&r?reviewDialog(r,state.reviewDraft?.id===r.id?state.reviewDraft:{},state.reportPending):'';}
  const c=state.modal==='new'?{}:state.contacts.find(item=>item.id===state.modal)||{};
@@ -247,7 +250,7 @@ function clearPrivateState(){
  state.credentials=[];state.roster=null;state.rosterRaw='';state.modal=null;state.view='consultar';
  state.recent=[];state.favorites=[];
  state.filters={cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''};state.mobileMenu=false;
- state.contactDraft=null;
+ state.contactDraft=null;state.monitorRows=[];state.monitorDraft=null;
 }
 const authNotice=()=>state.notice?'<div class="toast '+h(state.notice.kind)+'" role="status">'+h(state.notice.message)+'</div>':'';
 function rememberConsultation(){
@@ -255,6 +258,7 @@ function rememberConsultation(){
  try{sessionStorage.setItem('cop-consultation:'+state.user.id,JSON.stringify({view:['consultar','diretorio','favoritos','recentes'].includes(state.view)?state.view:'consultar',filters:state.filters}));}catch{}
 }
 function captureDraft(){
+ const monitorForm=root.querySelector('#monitorCoverageForm');if(monitorForm&&userIsAdmin())state.monitorDraft=monitorForm.elements.namedItem('coverage').value;
  const report=document.querySelector('#reportForm');
  if(report)state.reportDraft={id:report.dataset.id,reason:report.elements.reason.value,message:report.elements.message.value};
  const review=document.querySelector('#reportReviewForm');
@@ -420,6 +424,18 @@ root.addEventListener('submit',async e=>{
   finally{state.busy=false;}
   return;
  }
+ if(e.target.id==='monitorCoverageForm'||e.target.id==='monitorGroupForm'){
+  e.preventDefault();if(state.busy||!userIsAdmin())return;
+  captureDraft();const coverageSubmission=e.target.id==='monitorCoverageForm',form=new FormData(e.target),id=e.target.dataset.id,epoch=state.sessionEpoch||0;
+  state.busy=true;render();
+  try{
+   if(coverageSubmission)await store.setMonitoringCoverage(id,parseMonitoringCoverage(String(form.get('coverage')||'')));
+   else await store.setMonitoringGroup(String(form.get('alias')||''),String(form.get('cluster')||''),String(form.get('ufs')||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean));
+   if(epoch===(state.sessionEpoch||0)&&userIsAdmin()){if(coverageSubmission){state.modal=null;state.monitorDraft=null;}toast('Configuração do monitoramento confirmada.','success');}
+  }catch(error){if(epoch===(state.sessionEpoch||0))toast(error.message||'Não foi possível confirmar.','error');}
+  finally{state.busy=false;render();}
+  return;
+ }
  if(e.target.id==='contactForm'){
   e.preventDefault();if(state.busy)return;
   const f=new FormData(e.target),phone=normalizePhone(f.get('phone_e164'));
@@ -502,6 +518,12 @@ root.addEventListener('click',async e=>{
  }
  if(action==='retry-session'){await recoverSession({reload:true});return;}
  if(state.connection!=='online')return;
+ if(action==='monitor-coverage'){
+  if(!userIsAdmin()||state.busy)return;
+  const epoch=state.sessionEpoch||0;
+  try{const rows=await store.monitoringCoverage(btn.dataset.id);if(epoch===(state.sessionEpoch||0)&&userIsAdmin()){state.monitorRows=rows;state.monitorDraft=null;state.modalReturn={action,id:btn.dataset.id};state.modal='monitor:'+btn.dataset.id;render();root.querySelector('#monitorCoverageForm textarea')?.focus();}}
+  catch(error){if(epoch===(state.sessionEpoch||0))toast(error.message||'Não foi possível carregar a abrangência.','error');}return;
+ }
  if(action==='reports-refresh'){await loadReports();return;}
  if(action==='report'){
   if(store.demo||!state.contacts.some(c=>c.id===btn.dataset.id))return;
@@ -637,10 +659,10 @@ root.addEventListener('click',async e=>{
  }
 });
 root.addEventListener('keydown',event=>{
- if(!state.modal?.startsWith('report:')&&!state.modal?.startsWith('review:'))return;
- if(event.key==='Escape'&&!state.reportPending){event.preventDefault();closeReportModal();return;}
+ if(!state.modal?.startsWith('report:')&&!state.modal?.startsWith('review:')&&!state.modal?.startsWith('monitor:'))return;
+ if(event.key==='Escape'&&!state.reportPending&&!state.busy){event.preventDefault();closeReportModal();return;}
  if(event.key!=='Tab')return;
- const fields=Array.from(root.querySelectorAll('.report-dialog button:not(:disabled),.report-dialog input,.report-dialog select,.report-dialog textarea'));
+ const fields=Array.from(root.querySelectorAll('.report-dialog button:not(:disabled),.report-dialog input,.report-dialog select,.report-dialog textarea,.report-dialog summary')).filter(element=>element.getClientRects().length>0);
  const first=fields[0],last=fields.at(-1);
  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
@@ -655,7 +677,7 @@ const recoverSession=createSessionRecovery({
  verified:async(user,{reload})=>{
   const changed=state.user?.id!==user.id,roleChanged=state.user?.role!==user.role;
   const needsData=reload||changed||roleChanged||state.connection!=='online';
-  if(roleChanged&&state.user){state.sessionEpoch=(state.sessionEpoch||0)+1;state.contacts=[];state.accounts=[];state.pendingRoster=[];state.credentials=[];state.upload=null;state.modal=null;state.batches=[];state.audit=[];state.reports=[];state.reportsLoading=false;state.reportsError='';state.reportPending=false;state.reportDraft=null;state.reviewDraft=null;state.modalReturn=null;state.sharePending=false;state.view='consultar';}
+  if(roleChanged&&state.user){state.monitorRows=[];state.monitorDraft=null;state.sessionEpoch=(state.sessionEpoch||0)+1;state.contacts=[];state.accounts=[];state.pendingRoster=[];state.credentials=[];state.upload=null;state.modal=null;state.batches=[];state.audit=[];state.reports=[];state.reportsLoading=false;state.reportsError='';state.reportPending=false;state.reportDraft=null;state.reviewDraft=null;state.modalReturn=null;state.sharePending=false;state.view='consultar';}
   if(!store.demo)state.user=user;
   if(changed){loadPreferences();if(!store.demo)restoreConsultation();}
   if(needsData)await refresh();

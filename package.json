@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check src/core.mjs && node --check src/workbook.mjs && node --check src/store.mjs && node --check src/app.mjs && node --check src/users.mjs && node --check src/contact-reports.mjs && node --check src/contact-actions.mjs && node --check src/session-lifecycle.mjs && node --check src/pwa.mjs && node --check src/theme.js && node --check src/region-maps.mjs && node --check sw.js",
+    "check": "node --check src/core.mjs && node --check src/workbook.mjs && node --check src/store.mjs && node --check src/app.mjs && node --check src/users.mjs && node --check src/contact-reports.mjs && node --check src/contact-actions.mjs && node --check src/session-lifecycle.mjs && node --check src/pwa.mjs && node --check src/theme.js && node --check src/region-maps.mjs && node --check sw.js && node --check src/monitoring.mjs && node --check extension/monitor.js && node --check extension/monitor-policy.js && node --check extension/monitor-background.js && node --check extension/portal-monitor.js && node --check extension/background.js && node --check extension/options.js",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/serve.mjs"
   },
