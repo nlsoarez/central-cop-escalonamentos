@@ -29,6 +29,7 @@ const expect = ({data,error}) => {if(error)throw error;return data;};
 const unavailable = () => Object.assign(Error('Não foi possível validar sua sessão agora. Reconecte para tentar novamente.'),{transient:true});
 const terminalAuthError = error => [400,401,403].includes(error?.status) && error?.name !== 'AuthRetryableFetchError';
 export const store={
+  firstAccessEnabled:setting.firstAccessEnabled===true,
   configured:configured || Boolean(configurationError),
   configurationError,
   demo:!client && !configurationError,
@@ -84,6 +85,8 @@ export const store={
     return this.invoke('cop-change-password',{currentPassword,newPassword});
   },
   async initialSetup(token,password){return this.invoke('cop-initial-setup',{token,password});},
+  async requestFirstAccess(login){return this.invoke('cop-first-access',{action:'request',login});},
+  async activateFirstAccess(token,password){return this.invoke('cop-first-access',{action:'activate',token,password});},
   async pendingRoster(){
     if(!client)return [];
     return expect(await client.from('cop_pending_roster').select('login_id,display_name').order('login_id'));

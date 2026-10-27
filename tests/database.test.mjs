@@ -220,6 +220,46 @@ test('migrações, RLS, sessões e importações em PostgreSQL isolado',async t=
   assert.equal((await db.query("select count(*) from public.cop_user_audit where target=$1 and event='promote_admin'",[viewer])).rows[0].count,1);
   await db.query("update public.cop_profiles set role='viewer' where id=$1",[viewer]);
  });
+ await t.test('primeiro acesso protege e-mails, exige entrega, validade, conta pendente e uso único',async()=>{
+  await root();
+  const newcomer='10000000-0000-4000-8000-000000000058',hash='b'.repeat(64),other='c'.repeat(64);
+  await db.query('insert into auth.users values($1,$2)',[newcomer,'f9900058@users.central-cop.invalid']);
+  await db.query("update public.cop_profiles set login_id='F9900058',active=true,role='viewer',must_change_password=true where id=$1",[newcomer]);
+  await db.query("insert into public.cop_account_emails(login_id,display_name,email) values('F9900058','Pessoa Sintetica','synthetic@claro.com.br')");
+  for(const role of ['anon','authenticated']){
+   await as(role,viewer,viewerSession);
+   await assert.rejects(db.query('select * from public.cop_account_emails'),/permission denied/);
+   await assert.rejects(db.query('select * from public.cop_first_access'),/permission denied/);
+   await assert.rejects(db.query('select * from public.cop_reserve_first_access($1,$2)',['F9900058',hash]),/permission denied/);
+   await assert.rejects(db.query('select public.cop_consume_first_access($1,$2)',[newcomer,hash]),/permission denied/);
+  }
+  await as('service_role');
+  const reserve=async(login,h)=>(await db.query('select * from public.cop_reserve_first_access($1,$2)',[login,h])).rows;
+  const consume=async(h)=>(await db.query('select public.cop_consume_first_access($1,$2) result',[newcomer,h])).rows[0].result;
+  assert.equal((await reserve('F9999999',hash)).length,0);
+  assert.equal((await reserve('F9900058',hash))[0].user_id,newcomer);
+  assert.equal((await reserve('F9900058',other)).length,0,'cooldown does not replace an existing token');
+  assert.equal(await consume(hash),false,'pending delivery cannot activate');
+  await db.query("update public.cop_first_access set delivery='sent',expires_at=now()-interval '1 second' where user_id=$1",[newcomer]);
+  assert.equal(await consume(hash),false,'expired token');
+  await db.query("update public.cop_first_access set expires_at=now()+interval '10 minutes' where user_id=$1",[newcomer]);
+  await root();
+  await db.query('update public.cop_profiles set must_change_password=false where id=$1',[newcomer]);
+  await as('service_role');
+  assert.equal(await consume(hash),false,'existing personal password cannot be reset');
+  await root();
+  await db.query('update public.cop_profiles set must_change_password=true,active=false where id=$1',[newcomer]);
+  await as('service_role');
+  assert.equal(await consume(hash),false,'inactive account');
+  await root();
+  await db.query('update public.cop_profiles set active=true where id=$1',[newcomer]);
+  await as('service_role');
+  assert.equal(await consume(other),false);
+  assert.equal(await consume(hash),true);assert.equal(await consume(hash),false);
+  await root();
+  await db.query('delete from auth.users where id=$1',[newcomer]);
+  await root();
+ });
  await t.test('restauração de snapshot antigo sem ocorrência continua compatível',async()=>{
   await as('authenticated',admin,adminSession);
   await publish([contact('ES','Gestor legado')]);

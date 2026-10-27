@@ -58,7 +58,7 @@ export function createGateway({anonKey,serviceKey,origins,trustProxy=false,limit
    if(!service&&path==='/user'&&req.method!=='GET'){reply(403,{error:'Use o fluxo de troca de senha do portal'});return;}
    destination=route(path,upstreams.auth,url.search);
   }else if(url.pathname.startsWith('/rest/v1/'))destination=route(url.pathname.slice('/rest/v1'.length),upstreams.rest,url.search);
-  else if(/^\/functions\/v1\/(cop-manage-users|cop-change-password|cop-initial-setup)$/.test(url.pathname))destination=route(url.pathname.slice('/functions/v1'.length),upstreams.functions);
+  else if(/^\/functions\/v1\/(cop-manage-users|cop-change-password|cop-initial-setup|cop-first-access)$/.test(url.pathname))destination=route(url.pathname.slice('/functions/v1'.length),upstreams.functions);
   else {reply(404,{error:'Não encontrado'});return;}
   }catch{reply(400,{error:'Solicitação inválida'});return;}
   const isToken=url.pathname==='/auth/v1/token';

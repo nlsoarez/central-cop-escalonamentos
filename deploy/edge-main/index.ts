@@ -1,5 +1,5 @@
-// Dispatcher exclusivo das duas funções do Central COP. HS256 legado desta stack.
-const names=new Set(['cop-manage-users','cop-change-password','cop-initial-setup']);
+// Dispatcher exclusivo das funções do Central COP. HS256 legado desta stack.
+const names=new Set(['cop-manage-users','cop-change-password','cop-initial-setup','cop-first-access']);
 const decode=(part:string)=>Uint8Array.from(atob(part.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
 const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(Deno.env.get('JWT_SECRET')), {name:'HMAC',hash:'SHA-256'},false,['verify']);
 Deno.serve(async(req:Request)=>{

@@ -10,7 +10,8 @@ import {regionMap} from './region-maps.mjs';
 
 const root=document.getElementById('app');
 const initialSetupToken=new URLSearchParams(location.hash.slice(1)).get('setup')||'';
-if(initialSetupToken)history.replaceState(null,'',location.pathname+location.search);
+const activationToken=new URLSearchParams(location.hash.slice(1)).get('activate')||'';
+if(initialSetupToken||activationToken)history.replaceState(null,'',location.pathname+location.search);
 const DEMO_BANNER='Demonstração com contatos fictícios. Não utilize para acionamentos.';
 /* WhatsApp glyph: Bootstrap Icons, https://github.com/twbs/icons
 The MIT License (MIT)
@@ -67,7 +68,7 @@ const h=(value)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const userIsAdmin=()=>state.user?.active&&!state.user?.must_change_password&&state.user?.role==='admin';
 const storage=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const setStorage=(key,v)=>{try{localStorage.setItem(key,JSON.stringify(v));}catch{}};
-const state={setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
+const state={activationToken,firstAccessRequest:false,firstAccessPending:false,firstAccessSent:false,setupToken:initialSetupToken,pendingRoster:[],user:null,loading:true,contacts:[],view:'consultar',filters:{cluster:'',area:'',cidade:'',topologia:'',cargo:'',nivel:'',query:''},favorites:[],recent:[],upload:null,importMode:'merge',batches:[],accounts:[],roster:null,rosterRaw:'',credentials:[],modal:null,notice:'',busy:false};
 state.connection=navigator.onLine===false?'unavailable':'online';
 state.shareMode='auto';state.sharePending=false;state.reports=[];state.reportsLoading=false;state.reportsError='';state.reportFilter='open';state.reportDraft=null;state.reviewDraft=null;state.reportPending=false;state.modalReturn=null;
 const mobile=()=>matchMedia('(max-width: 760px)').matches;
@@ -215,6 +216,10 @@ function renderUserAudit(){
  const identity=id=>state.accounts.find(u=>u.id===id)?.login_id||id;
  return '<h3 class="subheading">Histórico administrativo</h3><div class="panel"><div class="table-overflow"><table class="preview-table"><thead><tr><th>Data</th><th>Operador</th><th>Conta</th><th>Ação</th></tr></thead><tbody>'+(state.audit||[]).map(a=>'<tr><td>'+h(new Date(a.created_at).toLocaleString('pt-BR'))+'</td><td>'+h(identity(a.actor))+'</td><td>'+h(identity(a.target))+'</td><td>'+h(events[a.event]||a.event)+'</td></tr>').join('')+'</tbody></table></div></div>';
 }
+function firstAccessView(){
+ const activating=Boolean(state.activationToken);
+ return '<div class="auth-screen"><section class="auth-card" aria-labelledby="first-access-title"><div class="auth-logo official-logo">'+brandIcon(64)+'</div><span class="overline">CENTRAL COP</span><h1 id="first-access-title">'+(activating?'Defina sua senha':'Primeiro acesso')+'</h1><p>'+(activating?'Escolha uma senha pessoal com pelo menos 12 caracteres. O link é individual e expira em 30 minutos.':'Informe sua matrícula para receber o link no e-mail corporativo cadastrado.')+'</p>'+(state.firstAccessSent?'<p role="status">Se houver um primeiro acesso pendente para esta matrícula, enviaremos o link ao e-mail corporativo cadastrado. Confira também o spam. Aguarde alguns minutos antes de solicitar novamente.</p>':'<form id="firstAccessForm" aria-busy="'+state.firstAccessPending+'">'+(activating?'<label>Nova senha<input type="password" name="password" minlength="12" maxlength="128" autocomplete="new-password" required></label><label>Confirme a senha<input type="password" name="confirmation" minlength="12" maxlength="128" autocomplete="new-password" required></label>':'<label>Matrícula<input type="text" name="login" minlength="5" maxlength="15" autocomplete="username" autocapitalize="characters" spellcheck="false" required></label>')+'<button class="btn primary" type="submit" '+(state.firstAccessPending?'disabled':'')+'>'+(state.firstAccessPending?'Aguarde…':activating?'Salvar minha senha':'Receber link de acesso')+'</button></form>')+'<button type="button" class="btn subtle" data-action="first-access-back" '+(state.firstAccessPending?'disabled':'')+'>Voltar ao login</button></section></div>';
+}
 function initialSetupView(){
  return '<div class="auth-screen"><div class="auth-card"><h1>Ativar administrador</h1><p>Defina a senha pessoal da conta administrativa. Este link só pode ser usado uma vez.</p><form id="initialSetupForm"><label>Nova senha pessoal<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><label>Confirme a senha<input name="confirmation" type="password" minlength="12" maxlength="128" autocomplete="new-password" required/></label><button class="btn primary" type="submit" '+(state.busy?'disabled':'')+'>Ativar acesso</button></form></div></div>';
 }
@@ -232,7 +237,7 @@ function renderModal(){
 }
 function loginView(){
  const dark=document.documentElement.dataset.theme==='dark';
- return '<div class="login-screen"><div class="login-layout"><aside class="login-story" aria-label="Central COP — Escalonamentos"><div class="login-brand">'+brandIcon(64)+'<div><strong>Central COP</strong><span>ESCALONAMENTOS</span></div></div><div class="login-story-copy"><span class="login-eyebrow">CENTRAL DE OPERAÇÕES</span><h2>Gestão de escalonamentos<br>operacionais.</h2><p>Encontre os responsáveis por região, localidade e nível de atendimento.</p><div class="login-capabilities"><span>'+ic('map',16)+' Regiões</span><span>'+ic('users',16)+' Responsáveis</span><span>'+ic('phone',16)+' Contatos</span></div></div><div class="login-story-footer"><span class="login-status-dot"></span>Portal interno · Equipe COP</div></aside><section class="login-main" aria-labelledby="login-title"><header class="login-main-top"><span>ACESSO AO PORTAL</span><button type="button" class="login-theme" data-action="theme" aria-pressed="'+dark+'" aria-label="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon',19)+'</button></header><div class="login-form-wrap"><div class="login-mobile-brand">'+brandIcon(56)+'<strong>Central COP<span>ESCALONAMENTOS</span></strong></div><span class="overline">BEM-VINDO À CENTRAL COP</span><h1 id="login-title">Entre na sua conta</h1><p class="login-lead">Acesse o diretório de contatos e escalonamentos da sua operação.</p><form id="loginForm" aria-busy="'+Boolean(state.loginPending)+'"><label for="login-user">Matrícula ou e-mail</label><div class="login-input">'+ic('users',18)+'<input id="login-user" type="text" name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Sua matrícula ou e-mail" /></div><small class="login-id-hint">A matrícula aceita maiúsculas e minúsculas.</small><div class="login-password-heading"><label for="login-password">Senha</label><span>Seu acesso pessoal</span></div><div class="login-input">'+ic('lock',18)+'<input id="login-password" type="password" name="password" required autocomplete="current-password" placeholder="Digite sua senha" /><button type="button" class="password-toggle" data-action="toggle-password" aria-controls="login-password" aria-label="Mostrar senha" aria-pressed="false">'+ic('eye',19)+'</button></div><button class="btn primary login-submit" type="submit" '+(state.loginPending?'disabled':'')+'><span>'+(state.loginPending?'Entrando…':'Entrar no portal')+'</span>'+ic('chevron',18)+'</button></form><div class="login-access-note">'+ic('info',18)+'<p><strong>Precisa de acesso?</strong><br>Solicite seu cadastro ao administrador do portal.</p></div></div><footer class="login-footer">'+ic('lock',14)+' Acesso exclusivo para usuários autorizados</footer></section></div></div>';
+ return '<div class="login-screen"><div class="login-layout"><aside class="login-story" aria-label="Central COP — Escalonamentos"><div class="login-brand">'+brandIcon(64)+'<div><strong>Central COP</strong><span>ESCALONAMENTOS</span></div></div><div class="login-story-copy"><span class="login-eyebrow">CENTRAL DE OPERAÇÕES</span><h2>Gestão de escalonamentos<br>operacionais.</h2><p>Encontre os responsáveis por região, localidade e nível de atendimento.</p><div class="login-capabilities"><span>'+ic('map',16)+' Regiões</span><span>'+ic('users',16)+' Responsáveis</span><span>'+ic('phone',16)+' Contatos</span></div></div><div class="login-story-footer"><span class="login-status-dot"></span>Portal interno · Equipe COP</div></aside><section class="login-main" aria-labelledby="login-title"><header class="login-main-top"><span>ACESSO AO PORTAL</span><button type="button" class="login-theme" data-action="theme" aria-pressed="'+dark+'" aria-label="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'" title="'+(dark?'Ativar tema claro':'Ativar tema escuro')+'">'+ic(dark?'settings':'moon',19)+'</button></header><div class="login-form-wrap"><div class="login-mobile-brand">'+brandIcon(56)+'<strong>Central COP<span>ESCALONAMENTOS</span></strong></div><span class="overline">BEM-VINDO À CENTRAL COP</span><h1 id="login-title">Entre na sua conta</h1><p class="login-lead">Acesse o diretório de contatos e escalonamentos da sua operação.</p><form id="loginForm" aria-busy="'+Boolean(state.loginPending)+'"><label for="login-user">Matrícula ou e-mail</label><div class="login-input">'+ic('users',18)+'<input id="login-user" type="text" name="email" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Sua matrícula ou e-mail" /></div><small class="login-id-hint">A matrícula aceita maiúsculas e minúsculas.</small><div class="login-password-heading"><label for="login-password">Senha</label><span>Seu acesso pessoal</span></div><div class="login-input">'+ic('lock',18)+'<input id="login-password" type="password" name="password" required autocomplete="current-password" placeholder="Digite sua senha" /><button type="button" class="password-toggle" data-action="toggle-password" aria-controls="login-password" aria-label="Mostrar senha" aria-pressed="false">'+ic('eye',19)+'</button></div><button class="btn primary login-submit" type="submit" '+(state.loginPending?'disabled':'')+'><span>'+(state.loginPending?'Entrando…':'Entrar no portal')+'</span>'+ic('chevron',18)+'</button></form>'+(store.firstAccessEnabled?'<button type="button" class="btn subtle first-access-link" data-action="first-access">Primeiro acesso · Definir minha senha</button>':'')+'<div class="login-access-note">'+ic('info',18)+'<p><strong>Precisa de acesso?</strong><br>Solicite seu cadastro ao administrador do portal.</p></div></div><footer class="login-footer">'+ic('lock',14)+' Acesso exclusivo para usuários autorizados</footer></section></div></div>';
 }
 function clearPrivateState(){
  state.shareMode='auto';state.sharePending=false;
@@ -293,6 +298,7 @@ function render(){
  rememberConsultation();
  if(store.configurationError){root.innerHTML='<div class="auth-screen"><div class="auth-card"><h1>Serviço indisponível</h1><p>'+h(store.configurationError)+'</p></div></div>';return;}
  if(state.connection!=='online'){root.innerHTML=connectionView();return;}
+ if(state.activationToken||state.firstAccessRequest){root.innerHTML=firstAccessView()+authNotice();return;}
  if(state.setupToken){root.innerHTML=initialSetupView()+authNotice();return;}
  if(state.loading){root.innerHTML='<div class="loading">'+ic('refresh',34)+' Carregando Central COP...</div>';return;}
  if(store.configured && state.user?.active && (state.user.must_change_password||state.view==='senha')){root.innerHTML=passwordChangeView()+authNotice();return;}
@@ -348,6 +354,18 @@ root.addEventListener('submit',async e=>{
   return;
  }
  if(e.target.id==='importPreviewFilter'){e.preventDefault();if(state.upload){state.upload.previewQuery=String(new FormData(e.target).get('previewQuery')||'');render();}return;}
+ if(e.target.id==='firstAccessForm'){
+  e.preventDefault();if(state.firstAccessPending)return;
+  const form=new FormData(e.target),password=String(form.get('password')||'');
+  if(state.activationToken&&password!==String(form.get('confirmation')||'')){toast('As senhas não coincidem.','error');return;}
+  state.firstAccessPending=true;e.target.setAttribute('aria-busy','true');e.target.querySelector('[type="submit"]').disabled=true;
+  try{
+   if(state.activationToken){await store.activateFirstAccess(state.activationToken,password);state.activationToken='';state.firstAccessRequest=false;clearPrivateState();toast('Senha definida. Entre com sua matrícula e senha pessoal.','success');}
+   else{await store.requestFirstAccess(String(form.get('login')||''));state.firstAccessSent=true;}
+  }catch(error){toast(error.message,'error');}
+  finally{state.firstAccessPending=false;render();}
+  return;
+ }
  if(e.target.id==='initialSetupForm'){
   e.preventDefault();if(state.busy)return;
   const form=new FormData(e.target),password=String(form.get('password')||'');
@@ -465,6 +483,8 @@ root.addEventListener('click',async e=>{
   return;
  }
  const action=btn.dataset.action;
+ if(action==='first-access'){state.firstAccessRequest=true;state.firstAccessSent=false;render();return;}
+ if(action==='first-access-back'){if(state.firstAccessPending)return;state.activationToken='';state.firstAccessRequest=false;state.firstAccessSent=false;render();return;}
  if(!action)return;
  if(action==='toggle-password'){
   const input=root.querySelector('#login-password');if(!input)return;
@@ -645,6 +665,8 @@ const recoverSession=createSessionRecovery({
 init();
 setupPwa({canUpdate:()=>!state.busy&&!state.modal&&!state.upload,notify:message=>toast(message)});
 window.addEventListener('hashchange',()=>{
+ const activation=new URLSearchParams(location.hash.slice(1)).get('activate');
+ if(activation){state.activationToken=activation;state.firstAccessSent=false;state.firstAccessRequest=false;history.replaceState(null,'',location.pathname+location.search);render();return;}
  const token=new URLSearchParams(location.hash.slice(1)).get('setup');
  if(token){state.setupToken=token;history.replaceState(null,'',location.pathname+location.search);render();}
 });

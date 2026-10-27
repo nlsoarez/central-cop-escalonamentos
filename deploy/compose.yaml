@@ -82,6 +82,8 @@ services:
       SUPABASE_ANON_KEY: ${ANON_KEY:?required}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?required}
       COP_ALLOWED_ORIGINS: https://central-cop-escalonamentos.vercel.app
+      COP_FIRST_ACCESS_ENABLED: ${COP_FIRST_ACCESS_ENABLED:-false}
+      COP_GMAIL_APP_PASSWORD: ${COP_GMAIL_APP_PASSWORD:-}
     volumes:
       - ./supabase/functions:/home/deno/functions:ro
       - ./deploy/edge-main:/home/deno/main:ro
@@ -109,6 +111,8 @@ services:
       - ./deploy/gateway.mjs:/app/gateway.mjs:ro
       - ./scripts/live-backend-check.mjs:/app/live-backend-check.mjs:ro
       - ./scripts/bootstrap-admin.mjs:/app/bootstrap-admin.mjs:ro
+      - ./scripts/provision-first-access.mjs:/app/scripts/provision-first-access.mjs:ro
+      - ./supabase/functions/_shared/security.mjs:/app/supabase/functions/_shared/security.mjs:ro
     command: [node, /app/gateway.mjs]
     healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8000/health').then(r=>{if(!r.ok)process.exit(1)})"], interval: 10s, timeout: 5s, retries: 10}
 networks:

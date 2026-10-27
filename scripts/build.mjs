@@ -12,7 +12,7 @@ export function publicConfig(env){
   let claims;try{claims=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString());}catch{}
   if(claims?.role!=='anon')throw Error('Somente chave publishable ou JWT anon pode ir ao frontend');
  }
- return {supabaseUrl:url,supabaseAnonKey:key};
+ return {supabaseUrl:url,supabaseAnonKey:key,firstAccessEnabled:env.COP_FIRST_ACCESS_ENABLED==='true'};
 }
 export async function build(output,env=process.env){
  const config=publicConfig(env);
