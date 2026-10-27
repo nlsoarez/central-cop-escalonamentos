@@ -45,4 +45,8 @@ Distribuir a pasta/ZIP `extension` 0.2.0. O usuário precisa recarregar a extens
 
 Migração aplicada em 27/10/2026: backup criptografado `20261027T043448Z`, estado privado `.state/monitoring-20261027-6e1e4026`. Permaneceram 1.841 contatos, sete aliases iniciais e zero abrangências operacionais confirmadas. Digests de contatos, perfis e hashes de senha idênticos antes/depois. Nenhum serviço reiniciado. Chamadas anônimas à consulta, à cobertura e à auditoria retornaram 401.
 
+Portal publicado no deployment `dpl_DvAhrtie2Uf1AC6Vv99rCTxEGFb4`, estado READY, código `fbd5681e6cae7499fbc80c5b73b09f3e0dccca09`. App, store, módulo monitoring e worker retornaram hashes idênticos ao build; primeiro acesso continuou habilitado e CORS HTTPS retornou 204. Reversão de frontend: `dpl_CXpN1t3Q9ZoPNT4bteNkBuiwfcAV` (preservar tabelas e vínculos).
+
+Pacote local `output/central-cop-assistente-0.2.0.zip`: 12 arquivos, manifest 0.2.0, SHA-256 `CD13F6F95FBFF93BB558DF75D49EC4307EF4A00FED6FEDAB4DC33EE33A5E0052`. Não foi instalado/recarregado no Chrome operacional nesta entrega. Prévia fictícia: `output/monitoramento-homologacao.png`. A chave temporária foi revogada e o par local descartado; as quatro chaves originais foram comparadas e preservadas.
+
 Fontes oficiais: [mensagens do Chrome](https://developer.chrome.com/docs/extensions/develop/concepts/messaging), [padrões de URL](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns). Seletores do monitoramento não foram presumidos a partir de código proprietário: a implementação lê cabeçalhos e aguarda homologação no DOM real.
